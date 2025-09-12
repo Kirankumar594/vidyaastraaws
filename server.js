@@ -37,7 +37,7 @@ const teacherLoginRoutes = require("./routes/teacherLoginRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const assignmentRoutes = require("./routes/assignmentRoute");
 const subject = require("./routes/subjectRoutes");
-
+const enquiryRoutes = require("./routes/enquiryRoute");
 dotenv.config();
 connectDB();
 
@@ -109,7 +109,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/teacher", teacherLoginRoutes);
 app.use("/api/subject", subject);
 app.use("/api/notifications", notificationRoutes);
-
+app.use("/api/enquiries", enquiryRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
