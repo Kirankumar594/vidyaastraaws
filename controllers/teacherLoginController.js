@@ -4,6 +4,7 @@ const School = require("../models/School");
 const TeacherLogin = require("../models/teacherLoginModel");
 const Class = require("../models/Class");
 const teacherLoginModel = require("../models/teacherLoginModel");
+const { uploadFile2 } = require("../config/AWS");
 
 // ---------------- REGISTER TEACHER ----------------
 exports.registerTeacher = async (req, res) => {
@@ -39,10 +40,10 @@ exports.registerTeacher = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Profile pic path (if uploaded via multer)
-    const profilePic = req.file
-      ? `/uploads/profilePics/${req.file.filename}`
-      : "";
-
+    let profilePic =  "";
+      if( req.file){
+        profilePic = await uploadFile2(req.file, "teachers");
+      }
     // ✅ Store names directly instead of ObjectIds
     const newTeacher = new TeacherLogin({
       name,
@@ -237,10 +238,12 @@ exports.updateTeacher = async (req, res) => {
     }
 
     // Handle profile pic update (if uploaded via multer)
-    const profilePic = req.file
-      ? `/uploads/profilePics/${req.file.filename}`
-      : teacher.profilePic;
-
+    let profilePic = null;
+    if (req.file) {
+      profilePic = await uploadFile2(req.file, "teachers");
+    } else {
+      profilePic = teacher.profilePic;
+    }
     // If password is provided, hash it
     let hashedPassword = teacher.password;
     if (password) {

@@ -26,9 +26,8 @@ const sendConfirmationEmail = async (enquiryData) => {
     });
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME || "Vidyaastra"}" <${
-        process.env.EMAIL_FROM
-      }>`,
+      from: `"${process.env.COMPANY_NAME || "Vidyaastra"}" <${process.env.EMAIL_FROM
+        }>`,
       to: enquiryData.email,
       subject: "Enquiry Received - We'll Get Back to You Soon! 🎓",
       html: `
@@ -65,38 +64,31 @@ const sendConfirmationEmail = async (enquiryData) => {
         <div style="background-color: #f8f9ff; padding: 25px; border-radius: 10px; margin: 30px 0; border-left: 5px solid #007bff; box-shadow: 0 2px 10px rgba(0,123,255,0.1);">
           <h2 style="color: #210d75; margin: 0 0 20px; font-size: 20px; font-weight: 600;">📋 Your Enquiry Details</h2>
           <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-size: 15px;">
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500; width: 100px;">Name:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.name
-            }</td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">School:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.school
-            }</td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Email:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.email
-            }</td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Phone:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.phone
-            }</td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Message:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.message
-            }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500; width: 100px;">Name:</td><td style="padding: 8px 0; color: #333;">${enquiryData.name
+        }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">School:</td><td style="padding: 8px 0; color: #333;">${enquiryData.school
+        }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Email:</td><td style="padding: 8px 0; color: #333;">${enquiryData.email
+        }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Phone:</td><td style="padding: 8px 0; color: #333;">${enquiryData.phone
+        }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Message:</td><td style="padding: 8px 0; color: #333;">${enquiryData.message
+        }</td></tr>
             <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Submitted:</td><td style="padding: 8px 0; color: #333;">${new Date(
-              enquiryData.createdAt
-            ).toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}</td></tr>
+          enquiryData.createdAt
+        ).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}</td></tr>
           </table>
         </div>
         
         <p style="color: #333333; line-height: 1.7; font-size: 16px; margin: 0 0 10px;">
-          Have an urgent question? Reach out anytime at <a href="mailto:${
-            process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
-          }" style="color: #007bff; text-decoration: none;">${
-        process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
-      }</a>.
+          Have an urgent question? Reach out anytime at <a href="mailto:${process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
+        }" style="color: #007bff; text-decoration: none;">${process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
+        }</a>.
         </p>
       </td>
     </tr>
@@ -113,12 +105,31 @@ const sendConfirmationEmail = async (enquiryData) => {
         </p>
         
         <!-- Social Icons Row -->
-        <div style="margin-bottom: 30px;">
-          <a href="https://facebook.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #3b5998; font-size: 24px; text-decoration: none;">📘</a>
-          <a href="https://twitter.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #1da1f2; font-size: 24px; text-decoration: none;">🐦</a>
-          <a href="https://linkedin.com/company/vidyaastra" style="display: inline-block; margin: 0 12px; color: #0077b5; font-size: 24px; text-decoration: none;">💼</a>
-          <a href="https://instagram.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #e1306c; font-size: 24px; text-decoration: none;">📷</a>
-        </div>
+       <table align="center" cellpadding="0" cellspacing="0" style="margin:20px auto; text-align:center;">
+  <tr>
+    <td style="padding:0 10px;">
+      <a href="https://www.facebook.com/profile.php?id=61580375357151" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="Twitter" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="https://www.linkedin.com/company/vidyaastra1/about/?viewAsMember=true" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733561.png" alt="LinkedIn" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" alt="Instagram" width="30" style="display:block;">
+      </a>
+    </td>
+  </tr>
+</table>
+
         
         <p style="color: #adb5bd; font-size: 12px; margin: 0; padding: 0 30px 20px; line-height: 1.4;">
           © 2025 Vidyaastra. All rights reserved. | <a href="https://vidyaastra.com/PrivacyPolicy" style="color: #6c757d;">Privacy Policy</a>
@@ -153,9 +164,8 @@ const sendAdminNotification = async (enquiryData) => {
     });
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME || "Vidyaastra"}" <${
-        process.env.EMAIL_FROM
-      }>`,
+      from: `"${process.env.COMPANY_NAME || "Vidyaastra"}" <${process.env.EMAIL_FROM
+        }>`,
       to: process.env.ADMIN_EMAIL,
       subject: `🚨 New Enquiry Received from ${enquiryData.name}`,
       html: `
@@ -189,28 +199,21 @@ const sendAdminNotification = async (enquiryData) => {
         <div style="background-color: #f8fff8; padding: 25px; border-radius: 10px; margin: 30px 0; border-left: 5px solid #28a745; box-shadow: 0 2px 10px rgba(40,167,69,0.1);">
           <h2 style="color: #155724; margin: 0 0 20px; font-size: 20px; font-weight: 600;">📋 Enquiry Details</h2>
           <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-size: 15px;">
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500; width: 100px;">Name:</td><td style="padding: 8px 0; color: #333;"><strong>${
-              enquiryData.name
-            }</strong></td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">School:</td><td style="padding: 8px 0; color: #333;"><strong>${
-              enquiryData.school
-            }</strong></td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Email:</td><td style="padding: 8px 0; color: #333;"><a href="mailto:${
-              enquiryData.email
-            }" style="color: #007bff; text-decoration: none; font-weight: 500;">${
-        enquiryData.email
-      }</a></td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Phone:</td><td style="padding: 8px 0; color: #333;"><a href="tel:${
-              enquiryData.phone
-            }" style="color: #007bff; text-decoration: none; font-weight: 500;">${
-        enquiryData.phone
-      }</a></td></tr>
-            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Message:</td><td style="padding: 8px 0; color: #333;">${
-              enquiryData.message
-            }</td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500; width: 100px;">Name:</td><td style="padding: 8px 0; color: #333;"><strong>${enquiryData.name
+        }</strong></td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">School:</td><td style="padding: 8px 0; color: #333;"><strong>${enquiryData.school
+        }</strong></td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Email:</td><td style="padding: 8px 0; color: #333;"><a href="mailto:${enquiryData.email
+        }" style="color: #007bff; text-decoration: none; font-weight: 500;">${enquiryData.email
+        }</a></td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Phone:</td><td style="padding: 8px 0; color: #333;"><a href="tel:${enquiryData.phone
+        }" style="color: #007bff; text-decoration: none; font-weight: 500;">${enquiryData.phone
+        }</a></td></tr>
+            <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Message:</td><td style="padding: 8px 0; color: #333;">${enquiryData.message
+        }</td></tr>
             <tr><td style="padding: 8px 0; color: #555; font-weight: 500;">Submitted:</td><td style="padding: 8px 0; color: #333;">${new Date(
-              enquiryData.createdAt
-            ).toLocaleString()}</td></tr>
+          enquiryData.createdAt
+        ).toLocaleString()}</td></tr>
           </table>
         </div>
         
@@ -231,12 +234,31 @@ const sendAdminNotification = async (enquiryData) => {
         </p>
         
         <!-- Social Icons Row -->
-        <div style="margin-bottom: 30px;">
-          <a href="https://facebook.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #3b5998; font-size: 24px; text-decoration: none;">📘</a>
-          <a href="https://twitter.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #1da1f2; font-size: 24px; text-decoration: none;">🐦</a>
-          <a href="https://linkedin.com/company/vidyaastra" style="display: inline-block; margin: 0 12px; color: #0077b5; font-size: 24px; text-decoration: none;">💼</a>
-          <a href="https://instagram.com/vidyaastra" style="display: inline-block; margin: 0 12px; color: #e1306c; font-size: 24px; text-decoration: none;">📷</a>
-        </div>
+       <table align="center" cellpadding="0" cellspacing="0" style="margin:20px auto; text-align:center;">
+  <tr>
+    <td style="padding:0 10px;">
+      <a href="https://www.facebook.com/profile.php?id=61580375357151" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="Twitter" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="https://www.linkedin.com/company/vidyaastra1/about/?viewAsMember=true" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733561.png" alt="LinkedIn" width="30" style="display:block;">
+      </a>
+    </td>
+    <td style="padding:0 10px;">
+      <a href="" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" alt="Instagram" width="30" style="display:block;">
+      </a>
+    </td>
+  </tr>
+</table>
+
         
         <p style="color: #adb5bd; font-size: 12px; margin: 0; padding: 0 30px 20px; line-height: 1.4;">
           © 2025 Vidyaastra. All rights reserved.

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Book = require("../models/Book");
 const Class = require("../models/Class"); // MODIFIED: Import Class model
+const { uploadFile2 } = require("../config/AWS");
 
 exports.getAllBooks = async (req, res) => {
   try {
@@ -167,7 +168,7 @@ exports.createBook = async (req, res) => {
     }
 
     // Get the file path for the uploaded image
-    const imagePath = `/uploads/books/${req.file.filename}`;
+    const imagePath =await uploadFile2(req.file, `books/${schoolId}`)
 
     // Create the book
     const book = new Book({
@@ -275,7 +276,7 @@ exports.updateBook = async (req, res) => {
 
     // Handle image update if provided
     if (req.file) {
-      updateFields.image = `/uploads/books/${req.file.filename}`;
+      updateFields.image = await uploadFile2(req.file, `books/${schoolId}`)
     }
 
     const updatedBook = await Book.findByIdAndUpdate(

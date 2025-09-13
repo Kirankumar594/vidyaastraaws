@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
+const { uploadFile2 } = require("../config/AWS");
 
 // Create School
 exports.createSchool = async (req, res) => {
@@ -54,7 +55,7 @@ exports.createSchool = async (req, res) => {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const logoUrl = `/Uploads/logos/${req.file.filename}`;
+    const logoUrl = await uploadFile2(req.file, `logos`);
 
     // Convert numbers properly
     const perStudentPriceNum = Number(perStudentPrice) || 0;
@@ -189,13 +190,8 @@ exports.updateSchool = async (req, res) => {
 
     // ✅ Update logo if a new one is uploaded
     if (req.file) {
-      if (school.logoUrl) {
-        const oldLogoPath = path.join(__dirname, "..", school.logoUrl);
-        if (fs.existsSync(oldLogoPath)) {
-          fs.unlinkSync(oldLogoPath);
-        }
-      }
-      school.logoUrl = `/Uploads/logos/${req.file.filename}`;
+    
+      school.logoUrl = await uploadFile2(req.file, `logos`);
     }
 
     // ✅ Update basic fields

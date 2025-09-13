@@ -1,6 +1,7 @@
 const Album = require("../models/Album");
 const path = require("path");
 const fs = require("fs");
+const { uploadFile2 } = require("../config/AWS");
 
 // Ensure uploads/albums directory exists
 const uploadDir = path.join(__dirname, "..", "uploads", "albums");
@@ -28,13 +29,16 @@ exports.uploadAlbum = async (req, res) => {
     }
 
     // Prepare image data for storage
-    const imageData = files.map((file) => ({
-      filename: file.filename,
-      // Store relative path instead of full system path
-      path: `/uploads/albums/${file.filename}`,
-      size: file.size,
-      mimetype: file.mimetype,
-    }));
+    const imageData = await Promise.all(
+      files.map(async (file) => ({
+        filename: file.filename,
+        // Store relative path instead of full system path
+        path: await uploadFile2(file, 'albums'),
+        size: file.size,
+        mimetype: file.mimetype,
+      }))
+    );
+
 
     // Create and save album
     const album = new Album({
@@ -135,7 +139,19 @@ exports.updateAlbum = async (req, res) => {
           message: "Album not found or does not belong to this school",
         });
     }
-
+    const imageData = await Promise.all(
+      files.map(async (file) => ({
+        filename: file.filename,
+        // Store relative path instead of full system path
+        path: await uploadFile2(file, 'albums'),
+        size: file.size,
+        mimetype: file.mimetype,
+      }))
+    );
+    if(imageData.length>0){
+      album.images.push(...imageData);
+      await album.save();
+    }
     res.status(200).json({ success: true, album });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -165,12 +181,12 @@ exports.deleteAlbum = async (req, res) => {
     }
 
     // Remove each file from disk
-    album.images.forEach((image) => {
-      const filePath = path.join(__dirname, "..", image.path);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
+    // album.images.forEach((image) => {
+    //   const filePath = path.join(__dirname, "..", image.path);
+    //   if (fs.existsSync(filePath)) {
+    //     fs.unlinkSync(filePath);
+    //   }
+    // });
 
     await Album.findByIdAndDelete({ _id: id, schoolId: schoolId }); // MODIFIED: Delete by ID AND schoolId
     res

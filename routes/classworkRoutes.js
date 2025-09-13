@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const classworkController = require('../controllers/classworkController');
-const upload = require('../utils/multer');
+const multer = require('multer');
+const upload =multer({});
 
 
 router.get("/all-unfiltered", classworkController.getAllClassworkUnfiltered)

@@ -2,6 +2,7 @@ const UniformItem = require("../models/UniformItem")
 const Class = require("../models/Class")
 const path = require("path")
 const fs = require("fs")
+const { uploadFile2 } = require("../config/AWS")
 
 // Ensure uploads/uniforms directory exists
 const uniformsBaseDir = path.join(__dirname, "../uploads/uniforms")
@@ -264,7 +265,7 @@ exports.createUniformItem = async (req, res) => {
     }
 
     // Construct imageUrl based on the uploaded file and schoolId
-    const imageUrl = `/uploads/uniforms/${schoolId}/${req.file.filename}`
+    const imageUrl = await uploadFile2(req.file, `uniforms/${schoolId}`)
 
     // Create item data
     const itemData = {
@@ -388,7 +389,7 @@ exports.updateUniformItem = async (req, res) => {
 
     // Update imageUrl if a new file is uploaded
     if (req.file) {
-      updateData.imageUrl = `/uploads/uniforms/${schoolId}/${req.file.filename}`
+      updateData.imageUrl =await uploadFile2(req.file, `uniforms/${schoolId}`)
 
       // Optionally delete old image file
       if (existingItem.imageUrl) {

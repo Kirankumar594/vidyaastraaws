@@ -43,7 +43,7 @@ const createSubject = async (req, res) => {
 
     // Check duplicate subject in the same class
     const existing = await SubjectModel.findOne({
-      subjectName: subjectName.trim(),
+      SubjectName: subjectName.trim(),
       classId,
       schoolId,
     });
@@ -56,7 +56,7 @@ const createSubject = async (req, res) => {
     }
 
     const subject = new SubjectModel({
-      subjectName: subjectName.trim(),
+      SubjectName: subjectName.trim(),
       classId,
       schoolId,
     });
@@ -108,10 +108,10 @@ const getAllSubjects = async (req, res) => {
     const { schoolId, classId } = req.params;
 
     let query = { schoolId };
-    if (classId) query.classId = classId;
+    // if (classId) query.classId = classId;
 
     const subjects = await SubjectModel.find(query)
-      .populate("classId", "className section")
+      // .populate("classId")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -133,16 +133,19 @@ const updateSubject = async (req, res) => {
     const { schoolId, subjectId } = req.params;
     const { subjectName } = req.body;
 
-    if (!subjectName) {
-      return res.status(400).json({ success: false, message: "subjectName is required" });
-    }
+    // if (!subjectName) {
+    //   return res.status(400).json({ success: false, message: "subjectName is required" });
+    // }
 
     const subject = await SubjectModel.findOne({ _id: subjectId, schoolId });
     if (!subject) {
       return res.status(404).json({ success: false, message: "Subject not found in this school" });
     }
 
-    subject.subjectName = subjectName.trim();
+    if(subjectName){
+       subject.SubjectName =subjectName.trim();
+    }
+   
     await subject.save();
 
     res.status(200).json({

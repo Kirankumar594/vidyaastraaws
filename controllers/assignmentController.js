@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const Assignment = require("../models/Assignment");
+const { uploadFile2 } = require("../config/AWS");
 
 // Get all assignments for a student
 exports.getStudentAssignments = async (req, res) => {
@@ -42,16 +43,6 @@ exports.submitAssignment = async (req, res) => {
     const { comments, studentId, schoolId } = req.body;
 
     if (!studentId || !schoolId) {
-      // Clean up uploaded files if any
-      if (req.files?.length) {
-        req.files.forEach((file) => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (err) {
-            console.error("Error deleting file:", err);
-          }
-        });
-      }
       return res.status(400).json({
         success: false,
         message: "Student ID and School ID are required",
@@ -65,15 +56,7 @@ exports.submitAssignment = async (req, res) => {
     });
 
     if (!assignment) {
-      if (req.files?.length) {
-        req.files.forEach((file) => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (err) {
-            console.error("Error deleting file:", err);
-          }
-        });
-      }
+   
       return res.status(404).json({
         success: false,
         message:
@@ -82,15 +65,7 @@ exports.submitAssignment = async (req, res) => {
     }
 
     if (assignment.status !== "pending") {
-      if (req.files?.length) {
-        req.files.forEach((file) => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (err) {
-            console.error("Error deleting file:", err);
-          }
-        });
-      }
+   
       return res.status(400).json({
         success: false,
         message: "Assignment already submitted",
@@ -101,26 +76,23 @@ exports.submitAssignment = async (req, res) => {
     const isLate = currentDate > assignment.dueDate;
 
     const attachments = [];
-    if (req.files?.length) {
-      req.files.forEach((file) => {
-        // FIXED: Ensure correct file path format
-        const relativePath = path.relative(
-          path.join(__dirname, "../"),
-          file.path
-        );
-        const normalizedPath = relativePath.replace(/\\/g, "/"); // Convert Windows paths to URL format
+if (req.files?.length) {
+  for (const file of req.files) {
+    // Upload the file and get normalized path
+    const normalizedPath = await uploadFile2(file, `assignments/${schoolId}`);
 
-        attachments.push({
-          url: `/${normalizedPath}`, // This will create paths like /uploads/assignments/filename.jpg
-          name: file.originalname,
-          type: file.mimetype,
-          size: file.size,
-        });
+    attachments.push({
+      url: `/${normalizedPath}`, // e.g., /uploads/assignments/filename.jpg
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
+    });
 
-        console.log(`File stored at: ${file.path}`);
-        console.log(`URL will be: /${normalizedPath}`);
-      });
-    }
+    console.log(`File stored at: ${file.path}`);
+    console.log(`URL will be: /${normalizedPath}`);
+  }
+}
+
 
     assignment.status = isLate ? "late" : "submitted";
     assignment.submittedDate = currentDate;
@@ -136,15 +108,7 @@ exports.submitAssignment = async (req, res) => {
     });
   } catch (error) {
     console.error("Submit assignment error:", error);
-    if (req.files?.length) {
-      req.files.forEach((file) => {
-        try {
-          fs.unlinkSync(file.path);
-        } catch (err) {
-          console.error("Error deleting file:", err);
-        }
-      });
-    }
+   
     res.status(500).json({
       success: false,
       message: "Server error",

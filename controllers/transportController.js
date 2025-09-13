@@ -81,8 +81,8 @@ exports.createTransport = async (req, res) => {
     const transport = await Transport.create(transportData);
 
     const populatedTransport = await Transport.findById(transport._id).populate(
-      "schoolId",
-      "name"
+      "schoolId"
+     
     );
 
     res.status(201).json({ success: true, data: populatedTransport });
@@ -109,7 +109,7 @@ exports.getAllTransports = async (req, res) => {
     // Fetch transports with pagination
     const transports = await Transport.find({ schoolId })
       .populate("assignedStudents.studentId", "name rollNumber classId phone")
-      .populate("schoolId", "name")
+      .populate("schoolId")
       .sort({ createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
@@ -177,7 +177,7 @@ exports.getTransportById = async (req, res) => {
   try {
     const { id } = req.params;
     const { schoolId } = req.query;
-
+    console.log("id",id,schoolId);
     if (!schoolId) {
       return res
         .status(400)
@@ -187,12 +187,12 @@ exports.getTransportById = async (req, res) => {
         });
     }
 
-    const transport = await Transport.findOne({ _id: id, schoolId: schoolId })
+    const transport = await Transport.findOne({ schoolId: schoolId })
       .populate(
         "assignedStudents.studentId",
         "name rollNumber classId phone parentPhone"
       )
-      .populate("schoolId", "name");
+      .populate("schoolId");
 
     if (!transport) {
       return res.status(404).json({
@@ -725,7 +725,7 @@ exports.getStudentTransportDetails = async (req, res) => {
     const transport = await Transport.findOne({
       schoolId: schoolId,
       "assignedStudents.studentId": studentId,
-    }).populate("schoolId", "name");
+    }).populate("schoolId");
 
     if (!transport) {
       return res

@@ -51,9 +51,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
+function parseUserAgent(userAgent) {
+  let browser = 'Unknown';
+  let os = 'Unknown';
+
+  // Detect Browser
+  if (userAgent.includes('Chrome')) browser = 'Chrome';
+  else if (userAgent.includes('Safari')) browser = 'Safari';
+  else if (userAgent.includes('Firefox')) browser = 'Firefox';
+  else if (userAgent.includes('Edge')) browser = 'Edge';
+  else if (userAgent.includes('MSIE') || userAgent.includes('Trident')) browser = 'Internet Explorer';
+
+  // Detect OS
+  if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('Mac OS')) os = 'MacOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
+
+  return { browser, os };
+}
+
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const { browser, os } = parseUserAgent(userAgent);
+
+  console.log(`Browser: ${browser}` + ` | OS: ${os}`  + ` | Time: ${new Date().toISOString()}` + ` | URL: ${req.originalUrl}` + ` | Method: ${req.method}` + ` | IP: ${req.ip}`);
+  console.log('---------------------------');
   next();
 });
 

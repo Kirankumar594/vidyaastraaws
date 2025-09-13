@@ -4,43 +4,36 @@ const fs = require("fs")
 const Class = require("../models/Class")
 
 // Helper function to process attachments and save files permanently
-const processAttachments = (files, schoolId) => {
-if (!files || files.length === 0) {
-  console.log("No files to process")
-  return []
-}
-
-console.log(`Processing ${files.length} files for school ${schoolId}`)
-
-return files.map((file) => {
-  try {
-    // Create permanent storage path, now including schoolId for organization
-    const uploadDir = path.join(__dirname, "../uploads/classwork", schoolId)
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true })
-      console.log(`Created directory: ${uploadDir}`)
-    }
-
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
-    const ext = path.extname(file.originalname)
-    const filename = file.fieldname + "-" + uniqueSuffix + ext
-    const filepath = path.join(uploadDir, filename)
-
-    // Move file from temp to permanent location
-    fs.renameSync(file.path, filepath)
-    console.log(`File moved from ${file.path} to ${filepath}`)
-
-    return {
-      name: file.originalname,
-      url: `/uploads/classwork/${schoolId}/${filename}`,
-    }
-  } catch (error) {
-    console.error(`Error processing file ${file.originalname}:`, error)
-    throw error
+const processAttachments = async (files, schoolId) => {
+  if (!files || files.length === 0) {
+    console.log("No files to process");
+    return [];
   }
-})
-}
+
+  try {
+    // Process all files in parallel using Promise.all
+    const uploadedFiles = await Promise.all(
+      files.map(async (file) => {
+        // Upload file to permanent storage
+        const normalizedPath = await uploadFile2(file, `classwork/${schoolId}`);
+
+        console.log(`File uploaded: ${file.originalname}`);
+        console.log(`Stored at: ${normalizedPath}`);
+
+        return {
+          name: file.originalname,
+          url: `/${normalizedPath}`, // final accessible URL
+        };
+      })
+    );
+
+    return uploadedFiles;
+  } catch (error) {
+    console.error("Error processing attachments:", error);
+    throw error;
+  }
+};
+
 
 // Get all classwork entries
 exports.getAllClasswork = async (req, res) => {
@@ -93,13 +86,7 @@ try {
   console.error("Error creating classwork:", error)
   
   // Clean up any uploaded files if error occurs
-  if (req.files) {
-    req.files.forEach((file) => {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path)
-      }
-    })
-  }
+
   res.status(400).json({ message: error.message })
 }
 }
@@ -135,13 +122,7 @@ try {
 
   if (!updatedClasswork) {
     // Clean up uploaded files if classwork not found
-    if (req.files) {
-      req.files.forEach((file) => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path)
-        }
-      })
-    }
+ 
     return res.status(404).json({ message: "Classwork not found or does not belong to this school/class" })
   }
 
@@ -150,13 +131,7 @@ try {
   console.error("Error updating classwork:", error)
   
   // Clean up uploaded files if error occurs
-  if (req.files) {
-    req.files.forEach((file) => {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path)
-      }
-    })
-  }
+
   res.status(400).json({ message: error.message })
 }
 }
@@ -179,13 +154,8 @@ try {
     return res.status(404).json({ message: "Classwork not found or does not belong to this school/class" })
   }
 
-  // Delete all associated files
-  classwork.attachments.forEach((attachment) => {
-    const filePath = path.join(__dirname, "../uploads/classwork", schoolId, path.basename(attachment.url))
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
-    }
-  })
+
+
 
   res.status(200).json({ message: "Classwork deleted successfully" })
 } catch (error) {

@@ -5,6 +5,7 @@ const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const School = require("../models/School");
 const { default: mongoose } = require("mongoose");
+const { uploadFile2 } = require("../config/AWS");
 
 // FIXED: Get Student Profile - Updated to include section information
 exports.getStudentProfile = async (req, res) => {
@@ -31,45 +32,16 @@ exports.updateStudentProfile = async (req, res) => {
     if (updateFields.password && updateFields.password.trim() !== "") {
       const salt = await bcrypt.genSalt(10);
       updateFields.password = await bcrypt.hash(updateFields.password, salt);
-    } else {
+    } else {await
       // prevent overwriting with empty string
       delete updateFields.password;
     }
 
-    // ✅ Handle profile image if uploaded
-    if (req.file) {
-      const student = await Student.findById(studentId);
-      if (!student) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Student not found" });
-      }
 
-      try {
-        const tempPath = req.file.path;
-        const fileName = req.file.filename;
-        const permanentDir = path.join(__dirname, "../Uploads/profiles"); // ✅ Match createStudent
-
-        if (!fs.existsSync(permanentDir)) {
-          fs.mkdirSync(permanentDir, { recursive: true });
-        }
-
-        const permanentPath = path.join(permanentDir, fileName);
-        fs.renameSync(tempPath, permanentPath);
-
-        // Delete old image if exists
-        if (student.profileImage) {
-          const oldImagePath = path.join(__dirname, "..", student.profileImage);
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-          }
-        }
-
-        updateFields.profileImage = `/Uploads/profiles/${fileName}`;
-      } catch (fileError) {
-        console.error("File upload error during update:", fileError);
-      }
-    }
+     if(req.file){
+        updateFields.profileImage =await uploadFile2(req.file,"students");
+     }
+  
 
     // ✅ Perform update
     const updatedStudent = await Student.findByIdAndUpdate(
@@ -78,7 +50,7 @@ exports.updateStudentProfile = async (req, res) => {
       { new: true, runValidators: true }
     )
       .populate("classId", "className section classTeacher")
-      .populate("schoolId", "name");
+      .populate("schoolId");
 
     if (!updatedStudent) {
       return res
@@ -124,8 +96,8 @@ exports.updateStudentProfile = async (req, res) => {
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.find()
-      .populate("classId", "className section classTeacher") // FIXED: Added 'section' and 'classTeacher'
-      .populate("schoolId", "name")
+      .populate("classId", "className section classTeacher")
+      .populate("schoolId")
       .sort({ createdAt: -1 });
 
     res.status(200).json(students);
@@ -147,7 +119,7 @@ exports.getStudentsBySchoolId = async (req, res) => {
 
     const students = await Student.find({ schoolId })
       .populate("classId", "className section classTeacher")
-      .populate("schoolId", "name")
+      .populate("schoolId")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -264,6 +236,50 @@ exports.createStudent = async (req, res) => {
       });
     }
 
+    const existingStudent = await Student.findOne({
+    rollNumber,
+    }).session(session);
+    if (existingStudent) {
+      await session.abortTransaction(); 
+      return res.status(400).json({
+        success: false,
+        message: "A student roll number already exists.",
+      });
+    } 
+    const existingStudentId = await Student.findOne({
+      studentId,
+    }).session(session);
+    if (existingStudentId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "A student ID already exists.",
+      });
+    }
+
+    const exiztingPhone = await Student.findOne({
+      phone,
+    }).session(session);  
+    if (exiztingPhone) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "A student phone number already exists.",
+      });
+    }
+
+    const existingEmail = await Student.findOne({
+      email,
+    }).session(session);  
+    if (existingEmail) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "A student email already exists.",
+      });
+    }
+
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -272,17 +288,7 @@ exports.createStudent = async (req, res) => {
     let profileImagePath = "";
     if (req.file) {
       try {
-        const tempPath = req.file.path;
-        const fileName = req.file.filename;
-        const permanentDir = path.join(__dirname, "../Uploads/profiles");
-
-        if (!fs.existsSync(permanentDir)) {
-          fs.mkdirSync(permanentDir, { recursive: true });
-        }
-
-        const permanentPath = path.join(permanentDir, fileName);
-        fs.renameSync(tempPath, permanentPath);
-        profileImagePath = `/Uploads/profiles/${fileName}`;
+        profileImagePath = await uploadFile2(req.file,"students");
       } catch (fileError) {
         console.error("File upload error:", fileError);
       }

@@ -192,8 +192,8 @@ exports.deleteTimetable = async (req, res) => {
 // ------------------ GET ALL SCHOOLS TIMETABLES (with Pagination + Optional School Filter) ------------------
 exports.getAllTimetables = async (req, res) => {
   try {
-    const { page = 1, limit = 10, schoolId } = req.query;
-
+    const { page = 1, limit = 10 } = req.query;
+      const { schoolId } = req.params; // Optional schoolId filter
     // Build filter condition
     let filter = {};
     if (schoolId) {
@@ -208,12 +208,12 @@ exports.getAllTimetables = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
-    if (!timetables || timetables.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No timetables found",
-      });
-    }
+    // if (!timetables || timetables.length === 0) {
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: "No timetables found",
+    //   });
+    // }
 
     res.status(200).json({
       success: true,

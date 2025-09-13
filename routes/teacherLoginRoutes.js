@@ -34,7 +34,7 @@ const storage = multer.diskStorage({
 });
 
 // Multer upload middleware
-const upload = multer({ storage });
+const upload = multer({  });
 
 // ✅ Routes
 

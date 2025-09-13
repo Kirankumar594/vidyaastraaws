@@ -1,7 +1,8 @@
 const express = require("express")
 const router = express.Router()
 const assignmentController = require("../controllers/assignmentController")
-const upload = require("../utils/multer")
+const multer = require("multer")
+const upload = multer()
 
 router.get("/all-unfiltered", assignmentController.getAllAssignmentsUnfiltered)
 router.get("/submitted", assignmentController.getSubmittedAssignmentsBySchool)
