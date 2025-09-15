@@ -304,15 +304,34 @@ exports.loginSchool = async (req, res) => {
 // ---------------- GET ALL SCHOOLS (with Pagination) ----------------
 exports.getAllSchools = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      search = "" 
+    } = req.query;
 
-    // ✅ Count total schools (excluding default pricing ones)
-    const total = await School.countDocuments({
-      isDefaultPricing: { $ne: true },
-    });
+    // Build search query
+    let searchQuery = {
+      isDefaultPricing: { $ne: true }
+    };
 
-    // ✅ Fetch schools with pagination
-    const schools = await School.find({ isDefaultPricing: { $ne: true } })
+    // Add search conditions if search term is provided
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i'); // case-insensitive search
+      searchQuery.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { schoolCode: searchRegex },
+        { address: searchRegex },
+        { phone: searchRegex }
+      ];
+    }
+
+    // ✅ Count total schools matching the search criteria
+    const total = await School.countDocuments(searchQuery);
+
+    // ✅ Fetch schools with pagination and search
+    const schools = await School.find(searchQuery)
       .select("-password")
       .sort({ createdAt: -1 }) // newest schools first
       .skip((page - 1) * limit)
@@ -321,7 +340,7 @@ exports.getAllSchools = async (req, res) => {
     if (!schools || schools.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No schools found",
+        message: search ? "No schools found matching your search" : "No schools found",
       });
     }
 
@@ -331,11 +350,15 @@ exports.getAllSchools = async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       totalPages: Math.ceil(total / limit),
+      search: search || "",
       data: schools,
     });
   } catch (err) {
     console.error("Get all schools error:", err.message);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
 

@@ -14,7 +14,7 @@ const createSubject = async (req, res) => {
     const { schoolId } = req.params;
     const { subjectName, classId } = req.body;
 
-    if (!subjectName || !schoolId || !classId) {
+    if (!subjectName || !schoolId ) {
       return res.status(400).json({
         success: false,
         message: "subjectName, classId and schoolId are required",
@@ -22,10 +22,10 @@ const createSubject = async (req, res) => {
     }
 
     // Validate ObjectIds
-    if (!mongoose.isValidObjectId(schoolId) || !mongoose.isValidObjectId(classId)) {
+    if (!mongoose.isValidObjectId(schoolId) ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid schoolId or classId",
+        message: "Invalid schoolId ",
       });
     }
 
@@ -36,15 +36,15 @@ const createSubject = async (req, res) => {
     }
 
     // Validate Class
-    const classData = await Class.findOne({ _id: classId, schoolId });
-    if (!classData) {
-      return res.status(404).json({ success: false, message: "Class not found in this school" });
-    }
+    // const classData = await Class.findOne({ _id: classId, schoolId });
+    // if (!classData) {
+    //   return res.status(404).json({ success: false, message: "Class not found in this school" });
+    // }
 
     // Check duplicate subject in the same class
     const existing = await SubjectModel.findOne({
       SubjectName: subjectName.trim(),
-      classId,
+   
       schoolId,
     });
 
@@ -57,7 +57,7 @@ const createSubject = async (req, res) => {
 
     const subject = new SubjectModel({
       SubjectName: subjectName.trim(),
-      classId,
+   
       schoolId,
     });
 
@@ -86,7 +86,7 @@ const getSubjectsBySchool = async (req, res) => {
     }
 
     const subjects = await Subject.find({ schoolId })
-      .populate("classId", "className section")
+      // .populate("classId", "className section")
       .sort({ createdAt: -1 });
 
     res.status(200).json({

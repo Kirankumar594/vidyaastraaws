@@ -4,7 +4,8 @@ const path = require("path");
 const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const School = require("../models/School");
-const { default: mongoose } = require("mongoose");
+const mongoose = require('mongoose');
+
 const { uploadFile2 } = require("../config/AWS");
 
 // FIXED: Get Student Profile - Updated to include section information
@@ -12,7 +13,7 @@ exports.getStudentProfile = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate("classId", "className section classTeacher") // FIXED: Added 'section' and 'classTeacher'
-      .populate("schoolId", "name");
+      .populate("schoolId");
 
     if (!student) return res.status(404).json({ message: "Student not found" });
 
@@ -32,16 +33,17 @@ exports.updateStudentProfile = async (req, res) => {
     if (updateFields.password && updateFields.password.trim() !== "") {
       const salt = await bcrypt.genSalt(10);
       updateFields.password = await bcrypt.hash(updateFields.password, salt);
-    } else {await
-      // prevent overwriting with empty string
-      delete updateFields.password;
+    } else {
+      await
+        // prevent overwriting with empty string
+        delete updateFields.password;
     }
 
 
-     if(req.file){
-        updateFields.profileImage =await uploadFile2(req.file,"students");
-     }
-  
+    if (req.file) {
+      updateFields.profileImage = await uploadFile2(req.file, "students");
+    }
+
 
     // ✅ Perform update
     const updatedStudent = await Student.findByIdAndUpdate(
@@ -95,13 +97,89 @@ exports.updateStudentProfile = async (req, res) => {
 // FIXED: Get All Students - Updated to include section information
 exports.getAllStudents = async (req, res) => {
   try {
-    const students = await Student.find()
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      schoolId = '',
+      classId = '',
+      gender = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Convert page and limit to integers
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Build search query
+    let query = {};
+
+    // Search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { rollNumber: { $regex: search, $options: 'i' } },
+        { studentId: { $regex: search, $options: 'i' } },
+        { fatherName: { $regex: search, $options: 'i' } },
+        { motherName: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { parentPhone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by school
+    if (schoolId) {
+      query.schoolId = schoolId;
+    }
+
+    // Filter by class
+    if (classId) {
+      query.classId = classId;
+    }
+
+    // Filter by gender
+    if (gender) {
+      query.gender = gender;
+    }
+
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get total count for pagination
+    const totalStudents = await Student.countDocuments(query);
+
+    // Get students with pagination
+    const students = await Student.find(query)
       .populate("classId", "className section classTeacher")
       .populate("schoolId")
-      .sort({ createdAt: -1 });
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNumber);
 
-    res.status(200).json(students);
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalStudents / limitNumber);
+    const hasNextPage = pageNumber < totalPages;
+    const hasPrevPage = pageNumber > 1;
+
+    res.status(200).json({
+      students,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalStudents,
+        studentsPerPage: limitNumber,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? pageNumber + 1 : null,
+        prevPage: hasPrevPage ? pageNumber - 1 : null
+      }
+    });
   } catch (error) {
+    console.error('Error in getAllStudents:', error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -141,6 +219,433 @@ exports.getStudentsBySchoolId = async (req, res) => {
     });
   }
 };
+
+
+exports.getStudentsByClass = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      schoolId = '',
+      gender = '',
+      sortBy = 'name',
+      sortOrder = 'asc'
+    } = req.query;
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Build query
+    let query = { classId };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { rollNumber: { $regex: search, $options: 'i' } },
+        { studentId: { $regex: search, $options: 'i' } },
+        { fatherName: { $regex: search, $options: 'i' } },
+        { motherName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by school if provided
+    if (schoolId) {
+      query.schoolId = schoolId;
+    }
+
+    // Filter by gender if provided
+    if (gender) {
+      query.gender = gender;
+    }
+
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get total count
+    const totalStudents = await Student.countDocuments(query);
+
+    // Get students
+    const students = await Student.find(query)
+      .populate("classId", "className section classTeacher")
+      .populate("schoolId")
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNumber);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalStudents / limitNumber);
+
+    res.status(200).json({
+      students,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalStudents,
+        studentsPerPage: limitNumber,
+        hasNextPage: pageNumber < totalPages,
+        hasPrevPage: pageNumber > 1,
+        nextPage: pageNumber < totalPages ? pageNumber + 1 : null,
+        prevPage: pageNumber > 1 ? pageNumber - 1 : null
+      }
+    });
+  } catch (error) {
+    console.error('Error in getStudentsByClass:', error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getStudentsBySchool = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      classId = '',
+      gender = '',
+      sortBy = 'name',
+      sortOrder = 'asc',
+
+    } = req.query;
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Build query
+    let query = { schoolId };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { rollNumber: { $regex: search, $options: 'i' } },
+        { studentId: { $regex: search, $options: 'i' } },
+        { fatherName: { $regex: search, $options: 'i' } },
+        { motherName: { $regex: search, $options: 'i' } },
+        { _id: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by class if provided
+    if (classId) {
+      query.classId = classId;
+    }
+
+    // Filter by gender if provided
+    if (gender) {
+      query.gender = gender;
+    }
+
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get total count
+    const totalStudents = await Student.countDocuments(query);
+
+    // Get students
+    const students = await Student.find(query)
+      .populate("classId", "className section classTeacher")
+      .populate("schoolId")
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNumber);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalStudents / limitNumber);
+
+    res.status(200).json({
+      students,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalStudents,
+        studentsPerPage: limitNumber,
+        hasNextPage: pageNumber < totalPages,
+        hasPrevPage: pageNumber > 1,
+        nextPage: pageNumber < totalPages ? pageNumber + 1 : null,
+        prevPage: pageNumber > 1 ? pageNumber - 1 : null
+      }
+    });
+  } catch (error) {
+    console.error('Error in getStudentsBySchool:', error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getStudentStats = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+
+    // Validate schoolId if provided
+    if (schoolId && !mongoose.isValidObjectId(schoolId)) {
+      return res.status(400).json({ message: 'Invalid schoolId format' });
+    }
+
+    // Build query object
+    let query = {};
+    if (schoolId) {
+      query.schoolId = new mongoose.Types.ObjectId(schoolId); // Cast to ObjectId
+    }
+
+    // Get total students
+    const totalStudents = await Student.countDocuments(query);
+
+    // Get gender breakdown (male and female counts)
+    const genderStats = await Student.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: '$gender',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Get total classes (unique classIds for the school)
+    const totalClasses = await Student.distinct('classId', query).then(distinctClasses => distinctClasses.length);
+
+    // Parse gender stats
+    const maleCount = genderStats.find(stat => stat._id === 'Male')?.count || 0;
+    const femaleCount = genderStats.find(stat => stat._id === 'Female')?.count || 0;
+
+    res.status(200).json({
+      totalStudents,
+      totalClasses,
+      maleCount,
+      femaleCount,
+      // Optional: Include other stats if needed (e.g., average age, etc.)
+    });
+  } catch (error) {
+    console.error('Error in getStudentStats:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getSchoolsWithStudentCounts = async (req, res) => {
+  try {
+    let {
+      page = 1,
+      limit = 9,
+      search = '',
+      dateRange = '',
+      id = ""
+    } = req.query;
+    let matchQuery = {};
+    if (id) {
+      page = 1;
+      matchQuery._id = new mongoose.Types.ObjectId(id);
+    }
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+
+    if (search) {
+      matchQuery.name = { $regex: search, $options: 'i' };
+    }
+
+
+    // Add dateRange filter
+    if (dateRange) {
+      const now = new Date();
+      let startDate;
+
+      switch (dateRange) {
+        case 'today':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          matchQuery.createdAt = { $gte: startDate };
+          break;
+        case 'lastWeek':
+          startDate = new Date(now.setDate(now.getDate() - 7));
+          matchQuery.createdAt = { $gte: startDate };
+          break;
+        case 'lastMonth':
+          startDate = new Date(now.setMonth(now.getMonth() - 1));
+          matchQuery.createdAt = { $gte: startDate };
+          break;
+        default:
+          break;
+      }
+    }
+
+    const schoolsAggregate = await School.aggregate([
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'schoolId',
+          as: 'students',
+        },
+      },
+      {
+        $addFields: {
+          studentCount: { $size: '$students' },
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          code: 1,
+          address: 1,
+          phone: 1,
+          studentCount: 1,
+          schoolCode: 1,
+        },
+      },
+      {
+        $sort: { name: 1 },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limitNumber,
+      },
+    ]);
+
+    const totalSchools = await School.countDocuments(matchQuery);
+    const totalPages = Math.ceil(totalSchools / limitNumber);
+
+    res.status(200).json({
+      schools: schoolsAggregate,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalSchools,
+        schoolsPerPage: limitNumber,
+        hasNextPage: pageNumber < totalPages,
+        hasPrevPage: pageNumber > 1,
+        nextPage: pageNumber < totalPages ? pageNumber + 1 : null,
+        prevPage: pageNumber > 1 ? pageNumber - 1 : null,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getSchoolsWithStudentCounts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+
+exports.getClassesWithStudentCounts = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+
+    // Validate schoolId
+    if (schoolId && !mongoose.isValidObjectId(schoolId)) {
+      return res.status(400).json({ message: 'Invalid schoolId format' });
+    }
+
+    let matchQuery = {};
+    if (schoolId) {
+      matchQuery.schoolId = new mongoose.Types.ObjectId(schoolId);
+    }
+
+    const classes = await Class.aggregate([
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'classId',
+          as: 'students',
+        },
+      },
+      {
+        $addFields: {
+          studentCount: { $size: '$students' },
+          maleCount: {
+            $size: {
+              $filter: {
+                input: '$students',
+                cond: { $eq: ['$$this.gender', 'Male'] },
+              },
+            },
+          },
+          femaleCount: {
+            $size: {
+              $filter: {
+                input: '$students',
+                cond: { $eq: ['$$this.gender', 'Female'] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'schools',
+          localField: 'schoolId',
+          foreignField: '_id',
+          as: 'school',
+        },
+      },
+      {
+        $unwind: {
+          path: '$school',
+          preserveNullAndEmptyArrays: true, // Handle cases where schoolId has no matching school
+        },
+      },
+      {
+        $project: {
+          id: '$_id',
+          name: {
+            $concat: ['$className', ' ', { $ifNull: ['$section', ''] }],
+          },
+          className: 1,
+          section: 1,
+          classTeacher: 1,
+          capacity: 1,
+          studentCount: 1,
+          maleCount: 1,
+          femaleCount: 1,
+          school: {
+            name: 1,
+            code: 1,
+          },
+        },
+      },
+      {
+        $sort: { className: 1, section: 1 },
+      },
+    ]);
+
+    res.status(200).json(classes);
+  } catch (error) {
+    console.error('Error in getClassesWithStudentCounts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getStudentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const student = await Student.findById(id)
+      .populate("classId", "className section classTeacher")
+      .populate("schoolId");
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.status(200).json(student);
+  } catch (error) {
+    console.error('Error in getStudentById:', error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 
 // NEW: Get Class Details - Separate endpoint for fetching complete class information
 exports.getClassDetails = async (req, res) => {
@@ -237,15 +742,15 @@ exports.createStudent = async (req, res) => {
     }
 
     const existingStudent = await Student.findOne({
-    rollNumber,
+      rollNumber,
     }).session(session);
     if (existingStudent) {
-      await session.abortTransaction(); 
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "A student roll number already exists.",
       });
-    } 
+    }
     const existingStudentId = await Student.findOne({
       studentId,
     }).session(session);
@@ -259,7 +764,7 @@ exports.createStudent = async (req, res) => {
 
     const exiztingPhone = await Student.findOne({
       phone,
-    }).session(session);  
+    }).session(session);
     if (exiztingPhone) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -270,7 +775,7 @@ exports.createStudent = async (req, res) => {
 
     const existingEmail = await Student.findOne({
       email,
-    }).session(session);  
+    }).session(session);
     if (existingEmail) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -288,7 +793,7 @@ exports.createStudent = async (req, res) => {
     let profileImagePath = "";
     if (req.file) {
       try {
-        profileImagePath = await uploadFile2(req.file,"students");
+        profileImagePath = await uploadFile2(req.file, "students");
       } catch (fileError) {
         console.error("File upload error:", fileError);
       }
@@ -562,7 +1067,7 @@ exports.getStudentsByClassName = async (req, res) => {
     // Find students belonging to this class
     const students = await Student.find({ classId: classData._id })
       .populate("classId", "className section classTeacher")
-      .populate("schoolId", "name")
+      .populate("schoolId")
       .sort({ createdAt: -1 });
 
     if (students.length === 0) {
@@ -585,5 +1090,53 @@ exports.getStudentsByClassName = async (req, res) => {
       message: "Server error",
       error: error.message,
     });
+  }
+};
+
+
+exports.bulkCreateStudents = async (req, res) => {
+  try {
+    const { students } = req.body;
+
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "Students array is required" });
+    }
+
+    const createdStudents = await Student.insertMany(students, { ordered: false });
+
+    res.status(201).json({
+      message: `${createdStudents.length} students created successfully`,
+      students: createdStudents
+    });
+  } catch (error) {
+    console.error('Error in bulkCreateStudents:', error);
+    res.status(400).json({ message: "Error creating students", error: error.message });
+  }
+};
+
+exports.bulkUpdateStudents = async (req, res) => {
+  try {
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ message: "Updates array is required" });
+    }
+
+    const bulkOps = updates.map(update => ({
+      updateOne: {
+        filter: { _id: update.id },
+        update: { ...update.data, updatedAt: new Date() }
+      }
+    }));
+
+    const result = await Student.bulkWrite(bulkOps);
+
+    res.status(200).json({
+      message: `${result.modifiedCount} students updated successfully`,
+      result
+    });
+  } catch (error) {
+    console.error('Error in bulkUpdateStudents:', error);
+    res.status(400).json({ message: "Error updating students", error: error.message });
   }
 };

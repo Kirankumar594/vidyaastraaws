@@ -3,57 +3,67 @@ const jwt = require("jsonwebtoken");
 const School = require("../models/School");
 const TeacherLogin = require("../models/teacherLoginModel");
 const Class = require("../models/Class");
-const teacherLoginModel = require("../models/teacherLoginModel");
 const { uploadFile2 } = require("../config/AWS");
 
 // ---------------- REGISTER TEACHER ----------------
 exports.registerTeacher = async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { email, password, name, subjects, classes, phone } = req.body;
+    let { email, password, name, phone, classSubjects } = req.body;
+
+    // Parse classSubjects if it's a string (from FormData)
+    if (typeof classSubjects === "string") {
+      try {
+        classSubjects = JSON.parse(classSubjects);
+      } catch (error) {
+        return res.status(400).json({ success: false, message: "Invalid classSubjects format" });
+      }
+    }
+
+    console.log("Register teacher data:", { name, email, phone, classSubjects });
 
     // Check if school exists
     const school = await School.findById(schoolId);
     if (!school) {
-      return res
-        .status(404)
-        .json({ success: false, message: "School not found" });
+      return res.status(404).json({ success: false, message: "School not found" });
     }
 
     // Check if email already exists
     const existingTeacher = await TeacherLogin.findOne({ email });
     if (existingTeacher) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email already registered" });
+      return res.status(400).json({ success: false, message: "Email already registered" });
     }
 
     // Check if phone already exists
     const existingPhone = await TeacherLogin.findOne({ phone });
     if (existingPhone) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Phone already registered" });
+      return res.status(400).json({ success: false, message: "Phone already registered" });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Profile pic path (if uploaded via multer)
-    let profilePic =  "";
-      if( req.file){
-        profilePic = await uploadFile2(req.file, "teachers");
-      }
-    // ✅ Store names directly instead of ObjectIds
+    // Handle profile picture upload
+    let profilePic = "";
+    if (req.file) {
+      profilePic = await uploadFile2(req.file, "teachers");
+    }
+
+    // Extract classes and subjects from classSubjects
+    const classes = classSubjects.map(cs => cs.className);
+    const subjects = [...new Set(classSubjects.flatMap(cs => cs.subjects))]; // Unique subjects
+
+    // Create new teacher
     const newTeacher = new TeacherLogin({
       name,
-      subjects, // e.g. ["Math", "English"]
-      classes, // e.g. ["Class 5", "Class 8"]
       email,
       phone,
       password: hashedPassword,
       schoolId,
       profilePic,
+      classes,
+      subjects,
+      classSubjects,
     });
 
     await newTeacher.save();
@@ -66,8 +76,9 @@ exports.registerTeacher = async (req, res) => {
         name: newTeacher.name,
         email: newTeacher.email,
         phone: newTeacher.phone,
-        subjects: newTeacher.subjects, // ✅ now names not IDs
-        classes: newTeacher.classes, // ✅ now names not IDs
+        subjects: newTeacher.subjects,
+        classes: newTeacher.classes,
+        classSubjects: newTeacher.classSubjects,
         schoolId: newTeacher.schoolId,
         profilePic: newTeacher.profilePic,
       },
@@ -86,17 +97,13 @@ exports.loginTeacher = async (req, res) => {
     // Check if teacher exists
     const teacher = await TeacherLogin.findOne({ email });
     if (!teacher) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Teacher not found" });
+      return res.status(404).json({ success: false, message: "Teacher not found" });
     }
 
     // Compare password
     const isMatch = await bcrypt.compare(password, teacher.password);
     if (!isMatch) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     // Generate JWT token
@@ -117,6 +124,7 @@ exports.loginTeacher = async (req, res) => {
         phone: teacher.phone,
         subjects: teacher.subjects,
         classes: teacher.classes,
+        classSubjects: teacher.classSubjects,
         schoolId: teacher.schoolId,
         profilePic: teacher.profilePic,
       },
@@ -131,12 +139,62 @@ exports.loginTeacher = async (req, res) => {
 exports.getAllTeachers = async (req, res) => {
   try {
     const { schoolId } = req.params;
+    const { page = 1, limit = 10, className, section, subject, dateRange } = req.query;
 
-    const teachers = await TeacherLogin.find({ schoolId }).select("-password");
+    // Build query
+    const query = { schoolId };
+
+    // Filter by className
+    if (className) {
+      query["classSubjects.className"] = { $regex: className, $options: "i" };
+    }
+
+    // Filter by section
+    if (section) {
+      query["classSubjects.className"] = {
+        $regex: `${section}$`,
+        $options: "i",
+      };
+    }
+
+    // Filter by subject
+    if (subject) {
+      query["classSubjects.subjects"] = { $in: [subject] };
+    }
+
+    // Filter by date range
+    if (dateRange) {
+      const now = new Date();
+      let startDate;
+      if (dateRange === "today") {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+      } else if (dateRange === "lastWeek") {
+        startDate = new Date(now.setDate(now.getDate() - 7));
+      } else if (dateRange === "lastMonth") {
+        startDate = new Date(now.setMonth(now.getMonth() - 1));
+      }
+      if (startDate) {
+        query.createdAt = { $gte: startDate };
+      }
+    }
+
+    // Count total teachers matching the query
+    const total = await TeacherLogin.countDocuments(query);
+
+    // Fetch teachers with pagination and filters
+    const teachers = await TeacherLogin.find(query)
+      .select("-password")
+      .sort({ createdAt: -1 }) // newest first
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
 
     res.status(200).json({
       success: true,
       count: teachers.length,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit),
       data: teachers,
     });
   } catch (error) {
@@ -156,9 +214,7 @@ exports.getTeacherById = async (req, res) => {
     }).select("-password");
 
     if (!teacher) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Teacher not found" });
+      return res.status(404).json({ success: false, message: "Teacher not found" });
     }
 
     res.status(200).json({
@@ -179,9 +235,7 @@ exports.deleteTeacher = async (req, res) => {
     // Check if teacher exists under this school
     const teacher = await TeacherLogin.findOne({ _id: teacherId, schoolId });
     if (!teacher) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Teacher not found" });
+      return res.status(404).json({ success: false, message: "Teacher not found" });
     }
 
     // Delete teacher
@@ -203,27 +257,32 @@ exports.deleteTeacher = async (req, res) => {
   }
 };
 
+// ---------------- UPDATE TEACHER ----------------
 exports.updateTeacher = async (req, res) => {
   try {
     const { schoolId, teacherId } = req.params;
-    const { name, email, phone, subjects, classes, password, classTeacherOf } =
-      req.body;
+    let { name, email, phone, subjects, classes, password, classTeacherOf, classSubjects } = req.body;
+
+    // Parse classSubjects if it's a string (from FormData)
+    if (typeof classSubjects === "string") {
+      try {
+        classSubjects = JSON.parse(classSubjects);
+      } catch (error) {
+        return res.status(400).json({ success: false, message: "Invalid classSubjects format" });
+      }
+    }
 
     // Find teacher under this school
     const teacher = await TeacherLogin.findOne({ _id: teacherId, schoolId });
     if (!teacher) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Teacher not found" });
+      return res.status(404).json({ success: false, message: "Teacher not found" });
     }
 
     // If email is being updated, check if it’s already taken
     if (email && email !== teacher.email) {
       const existingEmail = await TeacherLogin.findOne({ email });
       if (existingEmail) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Email already registered" });
+        return res.status(400).json({ success: false, message: "Email already registered" });
       }
     }
 
@@ -231,26 +290,23 @@ exports.updateTeacher = async (req, res) => {
     if (phone && phone !== teacher.phone) {
       const existingPhone = await TeacherLogin.findOne({ phone });
       if (existingPhone) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Phone already registered" });
+        return res.status(400).json({ success: false, message: "Phone already registered" });
       }
     }
 
-    // Handle profile pic update (if uploaded via multer)
-    let profilePic = null;
+    // Handle profile pic update
+    let profilePic = teacher.profilePic;
     if (req.file) {
       profilePic = await uploadFile2(req.file, "teachers");
-    } else {
-      profilePic = teacher.profilePic;
     }
+
     // If password is provided, hash it
     let hashedPassword = teacher.password;
     if (password) {
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
-    // ===== Handle classTeacherOf update =====
+    // Handle classTeacherOf update
     if (classTeacherOf && classTeacherOf !== String(teacher.classTeacherOf)) {
       // Remove teacher from previous class (if any)
       if (teacher.classTeacherOf) {
@@ -262,9 +318,7 @@ exports.updateTeacher = async (req, res) => {
       // Assign teacher to new class
       const newClass = await Class.findById(classTeacherOf);
       if (!newClass) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Class not found" });
+        return res.status(404).json({ success: false, message: "Class not found" });
       }
       newClass.classTeacher = teacherId;
       await newClass.save();
@@ -276,8 +330,9 @@ exports.updateTeacher = async (req, res) => {
     teacher.name = name || teacher.name;
     teacher.email = email || teacher.email;
     teacher.phone = phone || teacher.phone;
-    teacher.subjects = subjects || teacher.subjects;
-    teacher.classes = classes || teacher.classes;
+    teacher.subjects = classSubjects ? [...new Set(classSubjects.flatMap(cs => cs.subjects))] : teacher.subjects;
+    teacher.classes = classSubjects ? classSubjects.map(cs => cs.className) : teacher.classes;
+    teacher.classSubjects = classSubjects || teacher.classSubjects;
     teacher.password = hashedPassword;
     teacher.profilePic = profilePic;
 
@@ -293,6 +348,7 @@ exports.updateTeacher = async (req, res) => {
         phone: teacher.phone,
         subjects: teacher.subjects,
         classes: teacher.classes,
+        classSubjects: teacher.classSubjects,
         classTeacherOf: teacher.classTeacherOf,
         schoolId: teacher.schoolId,
         profilePic: teacher.profilePic,
@@ -304,7 +360,43 @@ exports.updateTeacher = async (req, res) => {
   }
 };
 
-// ---------------- GET ALL TEACHERS (All Schools, with Pagination) ----------------
+// ---------------- GET TEACHER BY ID (All Schools) ----------------
+exports.getTeacherByIdGlobal = async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+
+    // Validate ID format
+    if (!teacherId || !teacherId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid teacher ID format",
+      });
+    }
+
+    // Find teacher (not restricted to school)
+    const teacher = await TeacherLogin.findById(teacherId).select("-password");
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Teacher not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: teacher,
+    });
+  } catch (error) {
+    console.error("Get teacher by ID (global) error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+
 exports.getAllTeacherses = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -339,40 +431,3 @@ exports.getAllTeacherses = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-// ---------------- GET TEACHER BY ID (All Schools) ----------------
-// ---------------- GET TEACHER BY ID (All Schools) ----------------
-exports.getTeacherByIdGlobal = async (req, res) => {
-  try {
-    const { teacherId } = req.params;
-
-    // ✅ Validate ID format
-    if (!teacherId || !teacherId.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid teacher ID format",
-      });
-    }
-
-    // ✅ Find teacher (not restricted to school)
-    const teacher = await TeacherLogin.findById(teacherId).select("-password");
-
-    if (!teacher) {
-      return res.status(404).json({
-        success: false,
-        message: "Teacher not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: teacher,
-    });
-  } catch (error) {
-    console.error("Get teacher by ID (global) error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Internal server error",
-    });
-  }
-};
-
