@@ -190,7 +190,7 @@ exports.updateSchool = async (req, res) => {
 
     // ✅ Update logo if a new one is uploaded
     if (req.file) {
-    
+
       school.logoUrl = await uploadFile2(req.file, `logos`);
     }
 
@@ -304,10 +304,10 @@ exports.loginSchool = async (req, res) => {
 // ---------------- GET ALL SCHOOLS (with Pagination) ----------------
 exports.getAllSchools = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search = "" 
+    const {
+      page = 1,
+      limit = 10,
+      search = ""
     } = req.query;
 
     // Build search query
@@ -355,9 +355,9 @@ exports.getAllSchools = async (req, res) => {
     });
   } catch (err) {
     console.error("Get all schools error:", err.message);
-    res.status(500).json({ 
-      success: false, 
-      message: err.message 
+    res.status(500).json({
+      success: false,
+      message: err.message
     });
   }
 };
@@ -420,12 +420,10 @@ exports.uploadLogo = async (req, res) => {
         .json({ success: false, message: "Logo file is required" });
     }
 
-    if (school.logoUrl) {
-      const oldLogoPath = path.join(__dirname, "..", school.logoUrl);
-      if (fs.existsSync(oldLogoPath)) fs.unlinkSync(oldLogoPath);
-    }
 
-    school.logoUrl = `/Uploads/logos/${req.file.filename}`;
+    school.logoUrl = await uploadFile2(req.file, `logos`);
+
+
     school.color = req.body.color || school.color;
     await school.save();
 
@@ -479,12 +477,8 @@ exports.updateLogo = async (req, res) => {
         .json({ success: false, message: "New logo file is required" });
     }
 
-    if (school.logoUrl) {
-      const oldLogoPath = path.join(__dirname, "..", school.logoUrl);
-      if (fs.existsSync(oldLogoPath)) fs.unlinkSync(oldLogoPath);
-    }
 
-    school.logoUrl = `/Uploads/logos/${req.file.filename}`;
+    school.logoUrl = await uploadFile2(req.file, `logos`);
     school.color = req.body.color || school.color;
     await school.save();
 
@@ -596,9 +590,9 @@ exports.saveDefaultPricing = async (req, res) => {
       pricing.perStudentPrice = perStudentPrice;
       pricing.serviceCharge = serviceCharge;
       pricing.gstServiceCharge = gstServiceCharge;
-      } else {
+    } else {
       // Create new
-      
+
       pricing = new School({
         name: "Default Pricing",
         email: "default@pricing.com",

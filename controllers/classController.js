@@ -3,8 +3,8 @@ const Class = require("../models/Class");
 // ✅ Create Class
 exports.createClass = async (req, res) => {
   try {
-    const { className, students, section, schoolId } = req.body;
-
+    const { className, students, section, schoolId ,classTeacher } = req.body;
+     console.log(req.body);
     if (!schoolId) {
       return res.status(400).json({ success: false, message: "School ID is required." });
     }
@@ -13,7 +13,7 @@ exports.createClass = async (req, res) => {
       className,
       students: students || [], // array of student ObjectIds
       section,
-      // classTeacher: classTeacher || null, // reference to TeacherLogin
+      classTeacher: classTeacher || null, 
       schoolId,
     });
 

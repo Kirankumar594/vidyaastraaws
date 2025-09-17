@@ -88,7 +88,7 @@ const sendConfirmationEmail = async (enquiryData) => {
         <p style="color: #333333; line-height: 1.7; font-size: 16px; margin: 0 0 10px;">
           Have an urgent question? Reach out anytime at <a href="mailto:${process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
         }" style="color: #007bff; text-decoration: none;">${process.env.CONTACT_EMAIL || process.env.EMAIL_FROM
-        }</a>.
+        }</a> or cantact no: +91 8123486068.
         </p>
       </td>
     </tr>

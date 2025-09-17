@@ -714,6 +714,8 @@ exports.createStudent = async (req, res) => {
       motherName,
       parentPhone,
       schoolId,
+      classN,
+      section,
     } = req.body;
 
     if (!password) {
@@ -815,7 +817,8 @@ exports.createStudent = async (req, res) => {
       motherName,
       parentPhone,
       schoolId,
-      profileImage: profileImagePath,
+      profileImage: profileImagePath,classN,
+      section,
     });
 
     // Save student with session
@@ -879,23 +882,8 @@ exports.uploadProfileImage = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Please upload a file" });
 
-    const tempPath = req.file.path;
-    const fileName = req.file.filename;
-    const permanentDir = path.join(__dirname, "../uploads/profiles");
 
-    if (!fs.existsSync(permanentDir)) {
-      fs.mkdirSync(permanentDir, { recursive: true });
-    }
-
-    const permanentPath = path.join(permanentDir, fileName);
-    fs.renameSync(tempPath, permanentPath);
-
-    if (student.profileImage) {
-      const oldImagePath = path.join(__dirname, "..", student.profileImage);
-      if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
-    }
-
-    const newProfileImage = `/uploads/profiles/${fileName}`;
+    const newProfileImage = await uploadFile2(req.file, "students");
 
     const updatedStudent = await Student.findByIdAndUpdate(
       studentId,
@@ -922,10 +910,7 @@ exports.deleteProfileImage = async (req, res) => {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    if (student.profileImage) {
-      const imagePath = path.join(__dirname, "..", student.profileImage);
-      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-    }
+
 
     student.profileImage = "";
     await student.save();
