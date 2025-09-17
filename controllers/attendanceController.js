@@ -1,8 +1,5 @@
 const Attendance = require("../models/attendanceModel");
-const mongoose = require("mongoose");
-const Student = require("../models/Student");
-const School = require("../models/School");
-const Class = require("../models/Class");
+
 // Create Attendance
 exports.createAttendance = async (req, res) => {
   try {

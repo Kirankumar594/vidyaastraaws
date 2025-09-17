@@ -13,6 +13,12 @@ const attendanceSchema = new mongoose.Schema(
     status: {
       type: String,
     },
+    className: {
+      type: String,
+    },
+    section: {  
+      type: String,
+    },
     // MODIFIED: Add schoolId field
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
