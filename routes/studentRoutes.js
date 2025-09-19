@@ -24,5 +24,5 @@ router.delete("/:id/profile-image", studentController.deleteProfileImage);
 router.delete("/student/:id", studentController.deleteStudent);
 router.post("/bulk", studentController.bulkCreateStudents);
 router.put("/bulk/update", studentController.bulkUpdateStudents);
-
+router.get('/school/:schoolId/export',studentController.exportStudents);
 module.exports = router;

@@ -184,42 +184,322 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 
-// FIXED: Get Students by School ID - Updated to include section information
 exports.getStudentsBySchoolId = async (req, res) => {
   try {
     const { schoolId } = req.params;
-    let { page = 1, limit = 10 } = req.query; // default: page 1, limit 10
+    let { 
+      page = 1, 
+      limit = 10, 
+      name = "", 
+      className = "", 
+      section = "" 
+    } = req.query;
 
-    page = parseInt(page);
-    limit = parseInt(limit);
+    // Parse pagination parameters
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+    const skip = (pageNum - 1) * limitNum;
 
-    const totalStudents = await Student.countDocuments({ schoolId });
+    // Validate school ID
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required"
+      });
+    }
 
-    const students = await Student.find({ schoolId })
-      .populate("classId", "className section classTeacher")
-      .populate("schoolId")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+    // Build the aggregation pipeline
+    const pipeline = [
+      // Match students by school and name filter
+      {
+        $match: {
+          schoolId: new mongoose.Types.ObjectId(schoolId),
+          ...(name && name.trim() && {
+            $or: [
+              { name: { $regex: name.trim(), $options: "i" } },
+              { rollNumber: { $regex: name.trim(), $options: "i" } },
+              { studentId: { $regex: name.trim(), $options: "i" } },
+              { email: { $regex: name.trim(), $options: "i" } }
+            ]
+          })
+        }
+      },
+      // Lookup class information
+      {
+        $lookup: {
+          from: "classes", // Collection name for classes
+          localField: "classId",
+          foreignField: "_id",
+          as: "classInfo"
+        }
+      },
+      // Unwind class info (optional, for easier processing)
+      {
+        $unwind: {
+          path: "$classInfo",
+          preserveNullAndEmptyArrays: true // Keep students without classes
+        }
+      },
+      // Add class and section fields
+      {
+        $addFields: {
+          className: { $ifNull: ["$classInfo.className", "Unassigned"] },
+          section: { $ifNull: ["$classInfo.section", "N/A"] }
+        }
+      },
+      // Apply class name filter
+      ...(className && className.trim() !== "" && [
+        {
+          $match: {
+            className: className.trim()
+          }
+        }
+      ]),
+      // Apply section filter
+      ...(section && section.trim() !== "" && [
+        {
+          $match: {
+            section: section.trim()
+          }
+        }
+      ]),
+      // Group back to get count for pagination
+      {
+        $facet: {
+          // Data facet for paginated results
+          data: [
+            { $sort: { createdAt: -1, name: 1 } },
+            { $skip: skip },
+            { $limit: limitNum },
+            {
+              $lookup: {
+                from: "classes",
+                localField: "classId",
+                foreignField: "_id",
+                as: "classId"
+              }
+            },
+            {
+              $unwind: {
+                path: "$classId",
+                preserveNullAndEmptyArrays: true
+              }
+            },
+            {
+              $lookup: {
+                from: "schools",
+                localField: "schoolId",
+                foreignField: "_id",
+                as: "schoolId"
+              }
+            },
+            {
+              $unwind: {
+                path: "$schoolId",
+                preserveNullAndEmptyArrays: true
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                name: 1,
+                rollNumber: 1,
+                studentId: 1,
+                dob: 1,
+                gender: 1,
+                address: 1,
+                phone: 1,
+                email: 1,
+                fatherName: 1,
+                motherName: 1,
+                parentPhone: 1,
+                profileImage: 1,
+                classId: {
+                  _id: "$classId._id",
+                  className: "$classId.className",
+                  section: "$classId.section",
+                  classTeacher: "$classId.classTeacher"
+                },
+                schoolId: {
+                  _id: "$schoolId._id",
+                  name: "$schoolId.name"
+                },
+                createdAt: 1,
+                updatedAt: 1,
+                className: 1,
+                section: 1
+              }
+            }
+          ],
+          // Count facet for total count
+          count: [
+            { $count: "totalStudents" }
+          ]
+        }
+      }
+    ];
+
+    console.log("Student aggregation pipeline:", JSON.stringify(pipeline, null, 2));
+
+    // Execute aggregation
+    const result = await Student.aggregate(pipeline);
+
+    // Extract data and count
+    const paginatedStudents = result[0].data || [];
+    const totalStudentsResult = result[0].count[0] || { totalStudents: 0 };
+    const totalStudents = totalStudentsResult.totalStudents || 0;
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalStudents / limitNum);
+    const hasNext = pageNum < totalPages;
+    const hasPrev = pageNum > 1;
+
+    // Format the response data
+    const formattedStudents = paginatedStudents.map(student => ({
+      ...student,
+      id: student._id.toString(),
+      _id: undefined, // Remove _id from main object since we have id
+      className: student.className || student.classId?.className || "Unassigned",
+      section: student.section || student.classId?.section || "N/A",
+      classTeacher: student.classId?.classTeacher || null,
+      schoolName: student.schoolId?.name || "Unknown School"
+    }));
 
     res.status(200).json({
       success: true,
-      count: students.length,
+      message: `Successfully fetched ${formattedStudents.length} students`,
+      count: formattedStudents.length,
       totalStudents,
-      totalPages: Math.ceil(totalStudents / limit),
-      currentPage: page,
-      data: students,
+      totalPages,
+      currentPage: pageNum,
+      data: formattedStudents,
+      filters: {
+        name: name || "",
+        className: className || "",
+        section: section || ""
+      },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        skip: skip,
+        total: totalStudents,
+        totalPages: totalPages,
+        hasNext: hasNext,
+        hasPrev: hasPrev
+      }
     });
+
   } catch (error) {
-    console.error("Get students by school ID error:", error);
+    console.error("Get students by school ID error:", {
+      error: error.message,
+      stack: error.stack,
+      params: req.params,
+      query: req.query
+    });
+    
     res.status(500).json({
       success: false,
-      message: "Server error",
-      error: error.message,
+      message: "Server error while fetching students",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
 
+
+// Export students endpoint
+exports.exportStudents = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    let { 
+      limit = 10000, 
+      name = "", 
+      className = "", 
+      section = "" 
+    } = req.query;
+
+    // Parse limit
+    limit = parseInt(limit) || 10000;
+
+    // Build query object (same as getStudentsBySchoolId)
+    const query = { schoolId };
+
+    // Apply filters
+    if (name && name.trim()) {
+      query.$or = [
+        { name: { $regex: name.trim(), $options: "i" } },
+        { rollNumber: { $regex: name.trim(), $options: "i" } },
+        { studentId: { $regex: name.trim(), $options: "i" } },
+        { email: { $regex: name.trim(), $options: "i" } }
+      ];
+    }
+
+    if (className && className.trim() !== "") {
+      query["classId.className"] = className.trim();
+    }
+
+    if (section && section.trim() !== "") {
+      query["classId.section"] = section.trim();
+    }
+
+    console.log("Export query:", JSON.stringify(query, null, 2));
+
+    // Fetch all matching students with population
+    const students = await Student.find(query)
+      .populate({
+        path: "classId",
+        select: "className section"
+      })
+      .populate("schoolId", "name schoolCode")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    // Format export data
+    const exportData = students.map(student => ({
+      name: student.name || "",
+      className: student.classId?.className || "Unassigned",
+      section: student.classId?.section || "N/A",
+      rollNumber: student.rollNumber || "",
+      studentId: student.studentId || "",
+      dob: student.dob ? new Date(student.dob).toLocaleDateString('en-IN') : "",
+      gender: student.gender || "",
+      email: student.email || "",
+      phone: student.phone || "",
+      address: student.address || "",
+      fatherName: student.fatherName || "",
+      motherName: student.motherName || "",
+      parentPhone: student.parentPhone || "",
+      schoolName: student.schoolId?.name || "",
+      schoolCode: student.schoolId?.schoolCode || ""
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully prepared ${exportData.length} students for export`,
+      data: exportData,
+      filters: {
+        name: name || "",
+        className: className || "",
+        section: section || ""
+      },
+      totalExported: exportData.length
+    });
+
+  } catch (error) {
+    console.error("Export students error:", {
+      error: error.message,
+      stack: error.stack,
+      params: req.params,
+      query: req.query
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: "Server error while preparing export data",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
 
 exports.getStudentsByClass = async (req, res) => {
   try {

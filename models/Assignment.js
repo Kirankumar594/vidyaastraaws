@@ -18,6 +18,10 @@ const assignmentSchema = new mongoose.Schema({
   dueDate: {
     type: Date,
   },
+  teacherId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Teacher",
+  },
   status: {
     type: String,
     enum: ["pending", "submitted", "graded", "late"],
@@ -36,6 +40,13 @@ const assignmentSchema = new mongoose.Schema({
   teacherComments: {
     type: String,
   },
+  className: {
+    type: String,
+  },
+  section: {
+    type: String,
+  },
+
   attachments: [
     {
       url: {

@@ -1,7 +1,8 @@
 const Classwork = require("../models/Classwork")
 const path = require("path")
 const fs = require("fs")
-const Class = require("../models/Class")
+const Class = require("../models/Class");
+const { uploadFile2 } = require("../config/AWS");
 
 // Helper function to process attachments and save files permanently
 const processAttachments = async (files, schoolId) => {
@@ -22,7 +23,7 @@ const processAttachments = async (files, schoolId) => {
 
         return {
           name: file.originalname,
-          url: `/${normalizedPath}`, // final accessible URL
+          url: `${normalizedPath}`, // final accessible URL
         };
       })
     );
@@ -67,7 +68,7 @@ try {
   }
 
   // FIX: Use req.files directly, not req.files.attachments
-  const attachments = processAttachments(req.files, schoolId)
+  const attachments =await processAttachments(req.files, schoolId)
   console.log("Processed attachments:", attachments)
 
   const newClasswork = new Classwork({
@@ -93,62 +94,59 @@ try {
 
 // Update classwork with optional new attachments
 exports.updateClasswork = async (req, res) => {
-try {
-  const { id } = req.params
-  // MODIFIED: Get classId from body
-  const { subject, date, topic, description, schoolId, classId } = req.body
+  try {
+    const { id } = req.params;
+    const { subject, date, topic, description, schoolId, classId } = req.body;
 
-  if (!schoolId || !classId) { // MODIFIED: classId is now required for scoping
-    return res.status(400).json({ success: false, message: "School ID and Class ID are required." })
+    const updateData = { subject, date, topic, description };
+
+    // Process new attachments if any
+    if (req.files && req.files.length > 0) {
+      // ✅ FIX: Await the async processAttachments function
+      const newAttachments = await processAttachments(req.files, schoolId);
+
+      console.log("Processed attachments:", newAttachments);
+
+      if (Array.isArray(newAttachments) && newAttachments.length > 0) {
+        updateData.$push = {
+          attachments: { $each: newAttachments }
+        };
+      }
+    }
+
+    const updatedClasswork = await Classwork.findOneAndUpdate(
+      { _id: id },
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedClasswork) {
+      return res.status(404).json({
+        message: "Classwork not found or does not belong to this school/class",
+      });
+    }
+
+    res.status(200).json(updatedClasswork);
+  } catch (error) {
+    console.error("Error updating classwork:", error);
+    res.status(400).json({ message: error.message });
   }
+};
 
-  // MODIFIED: Include classId in updateData if it's meant to be updatable, otherwise remove it.
-  // For now, assuming classId is part of the identifying criteria, not typically updated.
-  const updateData = { subject, date, topic, description }
-
-  // Process new attachments if any
-  // FIX: Use req.files directly, not req.files.attachments
-  if (req.files && req.files.length > 0) {
-    const newAttachments = processAttachments(req.files, schoolId)
-    updateData.$push = { attachments: { $each: newAttachments } }
-  }
-
-  // MODIFIED: Filter by classId as well
-  const updatedClasswork = await Classwork.findOneAndUpdate(
-    { _id: id, schoolId: schoolId, classId: classId },
-    updateData,
-    { new: true }
-  )
-
-  if (!updatedClasswork) {
-    // Clean up uploaded files if classwork not found
- 
-    return res.status(404).json({ message: "Classwork not found or does not belong to this school/class" })
-  }
-
-  res.status(200).json(updatedClasswork)
-} catch (error) {
-  console.error("Error updating classwork:", error)
-  
-  // Clean up uploaded files if error occurs
-
-  res.status(400).json({ message: error.message })
-}
-}
 
 // Delete classwork and its attachments
 exports.deleteClasswork = async (req, res) => {
 try {
   const { id } = req.params
   // MODIFIED: Get classId from body
-  const { schoolId, classId } = req.body
+  // const { schoolId, classId } = req.body
 
-  if (!schoolId || !classId) { // MODIFIED: classId is now required for scoping
-    return res.status(400).json({ success: false, message: "School ID and Class ID are required." })
-  }
+  // if (!schoolId || !classId) { // MODIFIED: classId is now required for scoping
+  //   return res.status(400).json({ success: false, message: "School ID and Class ID are required." })
+  // }
 
   // MODIFIED: Filter by classId as well
-  const classwork = await Classwork.findOneAndDelete({ _id: id, schoolId: schoolId, classId: classId })
+  const classwork = await Classwork.findOneAndDelete({ _id: id})
 
   if (!classwork) {
     return res.status(404).json({ message: "Classwork not found or does not belong to this school/class" })
@@ -168,11 +166,11 @@ exports.deleteAttachment = async (req, res) => {
 try {
   const { id, attachmentId } = req.params
   // MODIFIED: Get classId from body
-  const { schoolId, classId } = req.body
+  // const { schoolId, classId } = req.body
 
-  if (!schoolId || !classId) { // MODIFIED: classId is now required for scoping
-    return res.status(400).json({ success: false, message: "School ID and Class ID are required." })
-  }
+  // if (!schoolId || !classId) { // MODIFIED: classId is now required for scoping
+  //   return res.status(400).json({ success: false, message: "School ID and Class ID are required." })
+  // }
 
   // MODIFIED: Filter by classId as well
   const classwork = await Classwork.findOne({ _id: id, schoolId: schoolId, classId: classId })
@@ -185,11 +183,6 @@ try {
     return res.status(404).json({ message: "Attachment not found" })
   }
 
-  // Delete the file
-  const filePath = path.join(__dirname, "../uploads/classwork", schoolId, path.basename(attachment.url))
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath)
-  }
 
   // Remove the attachment reference
   classwork.attachments.pull(attachmentId)
@@ -360,4 +353,3 @@ exports.getClassworkByClassNames = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-

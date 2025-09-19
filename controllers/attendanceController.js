@@ -5,6 +5,7 @@ exports.createAttendance = async (req, res) => {
   try {
     const { schoolId, ...rest } = req.body; // MODIFIED: Get schoolId from req.body
 
+    console.log("Creating attendance with data:", req.body);
     if (!schoolId) {
       return res
         .status(400)
@@ -81,6 +82,7 @@ exports.getAttendanceByStudent = async (req, res) => {
     res.status(404).json({ success: false, message: err.message });
   }
 };
+
 
 // Update Attendance
 exports.updateAttendance = async (req, res) => {
