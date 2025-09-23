@@ -339,7 +339,7 @@ exports.getStudentsBySchoolId = async (req, res) => {
       }
     ];
 
-    console.log("Student aggregation pipeline:", JSON.stringify(pipeline, null, 2));
+    // console.log("Student aggregation pipeline:", JSON.stringify(pipeline, null, 2));
 
     // Execute aggregation
     const result = await Student.aggregate(pipeline);

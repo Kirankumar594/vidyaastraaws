@@ -81,7 +81,7 @@ exports.getFees = async (req, res) => {
     const fees = await Fee.find(query)
       .populate({
         path: "studentId",
-        select: "name rollNumber class phone email",
+        select: "name rollNumber class phone email classId",
       })
       .skip(skip)
       .limit(limitNum)

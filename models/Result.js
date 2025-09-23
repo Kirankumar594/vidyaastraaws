@@ -16,7 +16,7 @@ const resultSchema = new mongoose.Schema(
         },
         examType: {
           type: String,
-          enum: ["Midterm", "Final", "Unit Test", "Quiz", "Practical", "Other"],
+          // enum: ["Midterm", "Final", "Unit Test", "Quiz", "Practical", "Other"],
           required: true,
         },
         examName: {
@@ -55,7 +55,7 @@ const resultSchema = new mongoose.Schema(
         },
         term: {
           type: String,
-          enum: ["Term 1", "Term 2", "Term 3", "Annual"],
+          // enum: ["Term 1", "Term 2", "Term 3", "Annual"],
           required: false,
         }
       },

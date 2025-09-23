@@ -39,6 +39,8 @@ const assignmentRoutes = require("./routes/assignmentRoute");
 const subject = require("./routes/subjectRoutes");
 const enquiryRoutes = require("./routes/enquiryRoute");
 const classesRoutes = require("./routes/classRoute");
+const exameRoutesType = require("./routes/exameRoute");
+const { default: axios } = require("axios");
 dotenv.config();
 connectDB();
 
@@ -136,7 +138,23 @@ app.use("/api/subject", subject);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/classes",classesRoutes);
+app.use("/api/exam-types", exameRoutesType);
 // Error handling middleware
+
+
+app.get('/proxy-image', async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+
+    res.set('Content-Type', response.headers['content-type']);
+    res.send(response.data);
+  } catch (error) {
+    res.status(500).send('Error fetching image');
+  }
+});
+
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: "Something went wrong!" });

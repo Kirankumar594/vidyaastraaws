@@ -1063,6 +1063,7 @@ exports.createResult = async (req, res) => {
       });
     }
   } catch (err) {
+    console.log("eerror===>",err)
     res.status(400).json({
       success: false,
       message: "Error creating/adding result",
@@ -1122,6 +1123,7 @@ exports.addResultToStudent = async (req, res) => {
       data: resultDoc,
     });
   } catch (err) {
+    console.log("error",err)
     res.status(400).json({
       success: false,
       message: "Error adding result to student",
