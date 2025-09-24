@@ -22,7 +22,7 @@ exports.createAttendance = async (req, res) => {
 // Get All Attendance Records
 exports.getAllAttendance = async (req, res) => {
   try {
-    const { schoolId, page = 1, limit = 10 } = req.query; // Added pagination defaults
+    const { schoolId, date, page = 1, limit = 10 } = req.query; // Added date parameter
 
     if (!schoolId) {
       return res.status(400).json({
@@ -31,20 +31,36 @@ exports.getAllAttendance = async (req, res) => {
       });
     }
 
+    // Build query object
+    const query = { schoolId };
+    
+    // Add date filter if provided
+    if (date) {
+      // Convert date string to Date object for proper comparison
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
+      
+      query.date = {
+        $gte: startOfDay,
+        $lt: endOfDay
+      };
+    }
+
     // Convert to number for MongoDB skip/limit
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
     // Fetch data with pagination
-    const attendance = await Attendance.find({ schoolId })
+    const attendance = await Attendance.find(query)
       .populate("studentId")
       .skip(skip)
       .limit(limitNum)
       .sort({ createdAt: -1 }); // Sort latest first
 
     // Count total docs for pagination info
-    const total = await Attendance.countDocuments({ schoolId });
+    const total = await Attendance.countDocuments(query);
 
     res.status(200).json({
       success: true,
@@ -143,6 +159,55 @@ exports.deleteAttendance = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Attendance deleted" });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Get Attendance by Date - NEW ENDPOINT
+exports.getAttendanceByDate = async (req, res) => {
+  try {
+    const { schoolId, date } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required in query parameters.",
+      });
+    }
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date is required in query parameters.",
+      });
+    }
+
+    // Convert date string to Date object for proper comparison
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
+
+    console.log(`Fetching attendance for school: ${schoolId}, date: ${date}`);
+    console.log(`Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+
+    // Fetch all attendance records for the specific date (no pagination for this endpoint)
+    const attendance = await Attendance.find({
+      schoolId: schoolId,
+      date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      }
+    }).populate("studentId");
+
+    console.log(`Found ${attendance.length} attendance records for date ${date}`);
+
+    res.status(200).json({
+      success: true,
+      count: attendance.length,
+      data: attendance,
+    });
+  } catch (err) {
+    console.error("Get attendance by date error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

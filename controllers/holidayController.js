@@ -2,7 +2,7 @@ const Holiday = require("../models/Holiday")
 
 const getAllHolidays = async (req, res) => {
   try {
-    const { year, type, search, schoolId } = req.query
+    const { year, type, search, schoolId, page = 1, limit = 10 } = req.query
 
     // WARNING: Relying on client-provided schoolId without authentication
     if (!schoolId) {
@@ -23,10 +23,26 @@ const getAllHolidays = async (req, res) => {
       query.name = { $regex: search, $options: "i" }
     }
 
-    const holidays = await Holiday.find(query).sort("date")
+    // Pagination setup
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Count total documents
+    const total = await Holiday.countDocuments(query);
+
+    // Fetch holidays with pagination
+    const holidays = await Holiday.find(query)
+      .sort("date")
+      .skip(skip)
+      .limit(limitNumber);
 
     res.json({
       success: true,
+      total,
+      page: pageNumber,
+      limit: limitNumber,
+      totalPages: Math.ceil(total / limitNumber),
       count: holidays.length,
       data: holidays,
     })

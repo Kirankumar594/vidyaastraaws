@@ -10,7 +10,7 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Class",
   },
-  classN: {
+  className: {
     type: String,
   },
   section: {

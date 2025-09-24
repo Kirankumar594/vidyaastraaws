@@ -46,7 +46,7 @@ const createBook = async (req, res) => {
 // Get all books
 const getAllBooks = async (req, res) => {
   try {
-    const { schoolId, category, search } = req.query // MODIFIED: Get schoolId, category, search from query
+    const { schoolId, category, search, page = 1, limit = 10 } = req.query // MODIFIED: Get schoolId, category, search, pagination from query
     const query = {}
 
     if (!schoolId) {
@@ -61,9 +61,26 @@ const getAllBooks = async (req, res) => {
       query.title = { $regex: search, $options: "i" } // Search by title
     }
 
-    const books = await LibraryBook.find(query) // MODIFIED: Filter by query
+    // Pagination setup
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Count total documents
+    const total = await LibraryBook.countDocuments(query);
+
+    // Fetch books with pagination
+    const books = await LibraryBook.find(query)
+      .sort({ createdAt: -1 }) // newest first
+      .skip(skip)
+      .limit(limitNumber);
+
     res.json({
       success: true,
+      total,
+      page: pageNumber,
+      limit: limitNumber,
+      totalPages: Math.ceil(total / limitNumber),
       data: books,
     })
   } catch (err) {

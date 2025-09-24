@@ -111,7 +111,7 @@ const uploadFile2 = (file, bucketname) => {
     const command = new PutObjectCommand(params);
     s3Client.send(command, (err, data) => {
       if (err) {
-        reject("File not uploaded");
+        reject("File not uploaded "+err);
       } else {
         // console.log(data);
         let location = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${params.Key}`;

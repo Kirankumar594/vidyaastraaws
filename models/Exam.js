@@ -15,7 +15,7 @@ const examSchema = new mongoose.Schema(
     },
     examType: {
       type: String,
-      enum: ["Midterm", "Final", "Unit Test", "Quiz", "Practical", "Other"],
+      // enum: ["Midterm", "Final", "Unit Test", "Quiz", "Practical", "Other"],
     },
     status: {
       type: String,

@@ -57,6 +57,7 @@ exports.createExam = async (req, res) => {
       data: exam,
     });
   } catch (err) {
+    console.log(err);
     if (err.code === 11000) {
       // MongoDB duplicate key error
       return res.status(409).json({
