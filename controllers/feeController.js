@@ -1,6 +1,7 @@
 const Fee = require("../models/feeModel")
 const Student = require("../models/Student")
 const School = require("../models/School")
+const mongoose = require("mongoose")
 const { v4: uuidv4 } = require("uuid")
 
 // Create new fee entry with admin-defined installment breakdown
@@ -211,7 +212,11 @@ exports.getFeeInstallmentReceiptData = async (req, res) => {
 
     const fee = await Fee.findById({ _id: feeId, schoolId: schoolId }).populate({
       path: "studentId",
-      select: "name rollNumber studentId class phone email", // MODIFIED: Added studentId
+      select: "name rollNumber studentId class phone email classId",
+      populate: {
+        path: "classId",
+        select: "className section"
+      }
     })
 
     if (!fee) {
@@ -224,6 +229,15 @@ exports.getFeeInstallmentReceiptData = async (req, res) => {
     }
 
     const installment = fee.installments[parsedIndex]
+
+    // Calculate pending amount correctly
+    const pendingAmount = installment.amount - installment.paid
+
+    // Create enhanced installment data with correct pending amount
+    const enhancedInstallment = {
+      ...installment.toObject(),
+      pending: Math.max(0, pendingAmount) // Ensure pending is never negative
+    }
 
     // Fetch school details
     const school = await School.findById(schoolId)
@@ -240,7 +254,7 @@ exports.getFeeInstallmentReceiptData = async (req, res) => {
           title: fee.title || fee.description || "Fee Payment",
           createdAt: fee.createdAt,
         },
-        installment: installment,
+        installment: enhancedInstallment,
         student: fee.studentId,
         school: school,
       },
@@ -275,33 +289,337 @@ exports.deleteFee = async (req, res) => {
 
   exports.getAllFeesUnfiltered = async (req, res) => {
     try {
-      const { page = 1, limit = 10 } = req.query; // pagination params
+      const { 
+        page = 1, 
+        limit = 10,
+        schoolId,
+        classId,
+        section,
+        paymentMethod,
+        status,
+        dateFrom,
+        dateTo,
+        search
+      } = req.query;
 
-      // Count total fees
-      const total = await Fee.countDocuments();
+      // Build filter query
+      let filterQuery = {};
+      
+      // School filter
+      if (schoolId) {
+        filterQuery.schoolId = schoolId;
+      }
 
-      // Fetch fees with pagination and populate student info
-      const fees = await Fee.find({})
-        .populate({
-          path: "studentId",
-          select: "name rollNumber class",
-        })
-        .sort({ createdAt: -1 }) // optional: newest first
-        .skip((page - 1) * limit)
-        .limit(parseInt(limit));
+      // Status filter - calculate based on installments
+      if (status) {
+        // We'll handle this in aggregation pipeline
+      }
+
+      // Date range filter
+      if (dateFrom || dateTo) {
+        filterQuery['installments.dueDate'] = {};
+        if (dateFrom) {
+          filterQuery['installments.dueDate'].$gte = new Date(dateFrom);
+        }
+        if (dateTo) {
+          filterQuery['installments.dueDate'].$lte = new Date(dateTo);
+        }
+      }
+
+      // Convert to numbers for pagination
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Build aggregation pipeline for complex filtering
+      let pipeline = [
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'studentId',
+            foreignField: '_id',
+            as: 'student'
+          }
+        },
+        {
+          $unwind: '$student'
+        },
+        {
+          $lookup: {
+            from: 'classes',
+            localField: 'student.classId',
+            foreignField: '_id',
+            as: 'class'
+          }
+        },
+        {
+          $unwind: {
+            path: '$class',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $lookup: {
+            from: 'schools',
+            localField: 'schoolId',
+            foreignField: '_id',
+            as: 'school'
+          }
+        },
+        {
+          $unwind: {
+            path: '$school',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $addFields: {
+            'student.className': '$class.className',
+            'student.section': '$class.section',
+            'schoolName': '$school.name'
+          }
+        }
+      ];
+
+      // Add text search filter
+      if (search) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'student.name': { $regex: search, $options: 'i' } },
+              { 'student.rollNumber': { $regex: search, $options: 'i' } },
+              { 'student.className': { $regex: search, $options: 'i' } },
+              { 'schoolName': { $regex: search, $options: 'i' } },
+              { 'installments.paymentMethod': { $regex: search, $options: 'i' } }
+            ]
+          }
+        });
+      }
+
+      // Add class filter
+      if (classId) {
+        pipeline.push({
+          $match: { 'student.classId': new mongoose.Types.ObjectId(classId) }
+        });
+      }
+
+      // Add section filter
+      if (section) {
+        pipeline.push({
+          $match: { 'student.section': section }
+        });
+      }
+
+      // Add payment method filter
+      if (paymentMethod) {
+        pipeline.push({
+          $match: { 'installments.paymentMethod': paymentMethod }
+        });
+      }
+
+      // Add status filter
+      if (status) {
+        pipeline.push({
+          $addFields: {
+            calculatedStatus: {
+              $cond: {
+                if: { $eq: [{ $size: '$installments' }, 0] },
+                then: 'pending',
+                else: {
+                  $let: {
+                    vars: {
+                      paidCount: {
+                        $size: {
+                          $filter: {
+                            input: '$installments',
+                            cond: { $eq: ['$$this.status', 'paid'] }
+                          }
+                        }
+                      },
+                      totalCount: { $size: '$installments' }
+                    },
+                    in: {
+                      $cond: {
+                        if: { $eq: ['$$paidCount', '$$totalCount'] },
+                        then: 'paid',
+                        else: {
+                          $cond: {
+                            if: { $gt: ['$$paidCount', 0] },
+                            then: 'partial',
+                            else: 'pending'
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+        pipeline.push({
+          $match: { calculatedStatus: status.toLowerCase() }
+        });
+      }
+
+      // Add date range filter
+      if (dateFrom || dateTo) {
+        let dateMatch = {};
+        if (dateFrom) {
+          dateMatch.$gte = new Date(dateFrom);
+        }
+        if (dateTo) {
+          dateMatch.$lte = new Date(dateTo);
+        }
+        pipeline.push({
+          $match: {
+            'installments.dueDate': dateMatch
+          }
+        });
+      }
+
+      // Add sorting and pagination
+      pipeline.push(
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limitNum }
+      );
+
+      // Execute aggregation
+      const fees = await Fee.aggregate(pipeline);
+
+      // Count total matching records
+      let countPipeline = [...pipeline];
+      countPipeline.pop(); // Remove limit
+      countPipeline.pop(); // Remove skip
+      countPipeline.push({ $count: 'total' });
+      
+      const countResult = await Fee.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
 
       res.status(200).json({
         success: true,
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit),
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
         data: fees,
       });
     } catch (err) {
+      console.error('Get all fees unfiltered error:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   };
+
+// Get filter options for super admin
+exports.getFilterOptions = async (req, res) => {
+  try {
+    // Get unique schools
+    const schools = await Fee.aggregate([
+      {
+        $lookup: {
+          from: 'schools',
+          localField: 'schoolId',
+          foreignField: '_id',
+          as: 'school'
+        }
+      },
+      {
+        $unwind: '$school'
+      },
+      {
+        $group: {
+          _id: '$schoolId',
+          name: { $first: '$school.name' }
+        }
+      },
+      {
+        $sort: { name: 1 }
+      }
+    ]);
+
+    // Get unique classes and sections
+    const classes = await Fee.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      {
+        $unwind: '$student'
+      },
+      {
+        $lookup: {
+          from: 'classes',
+          localField: 'student.classId',
+          foreignField: '_id',
+          as: 'class'
+        }
+      },
+      {
+        $unwind: {
+          path: '$class',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $group: {
+          _id: '$class._id',
+          className: { $first: '$class.className' },
+          section: { $first: '$class.section' }
+        }
+      },
+      {
+        $match: {
+          className: { $ne: null }
+        }
+      },
+      {
+        $sort: { className: 1, section: 1 }
+      }
+    ]);
+
+    // Get unique payment methods
+    const paymentMethods = await Fee.aggregate([
+      {
+        $unwind: '$installments'
+      },
+      {
+        $match: {
+          'installments.paymentMethod': { $ne: null, $ne: '' }
+        }
+      },
+      {
+        $group: {
+          _id: '$installments.paymentMethod'
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        schools: schools.map(s => ({ id: s._id, name: s.name })),
+        classes: classes.map(c => ({ 
+          id: c._id, 
+          className: c.className, 
+          section: c.section,
+          displayName: c.section ? `${c.className} ${c.section}` : c.className
+        })),
+        paymentMethods: paymentMethods.map(p => p._id)
+      }
+    });
+  } catch (err) {
+    console.error('Get filter options error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 
 exports.updateFee = async (req, res) => {

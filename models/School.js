@@ -76,10 +76,12 @@ schoolSchema.pre("save", async function (next) {
 
 // Virtuals for school
 schoolSchema.virtual("paid").get(function () {
+  if (!this.installments || !Array.isArray(this.installments)) return 0;
   return this.installments.reduce((sum, inst) => sum + (Number(inst.paid) || 0), 0);
 });
 
 schoolSchema.virtual("pending").get(function () {
+  if (!this.installments || !Array.isArray(this.installments)) return 0;
   return this.installments.reduce(
     (sum, inst) => sum + (Number(inst.amount) - Number(inst.paid)),
     0
@@ -87,6 +89,8 @@ schoolSchema.virtual("pending").get(function () {
 });
 
 schoolSchema.virtual("paymentStatus").get(function () {
+  if (!this.installments || !Array.isArray(this.installments)) return "pending";
+  
   const totalInstallments = this.installments.length;
   if (totalInstallments === 0) return "pending";
 

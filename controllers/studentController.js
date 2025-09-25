@@ -34,9 +34,8 @@ exports.updateStudentProfile = async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       updateFields.password = await bcrypt.hash(updateFields.password, salt);
     } else {
-      await
-        // prevent overwriting with empty string
-        delete updateFields.password;
+      // prevent overwriting with empty string
+      delete updateFields.password;
     }
 
 
@@ -154,7 +153,7 @@ exports.getAllStudents = async (req, res) => {
 
     // Get students with pagination
     const students = await Student.find(query)
-      .populate("classId", "className section classTeacher")
+      .populate("classId")
       .populate("schoolId")
       .sort(sort)
       .skip(skip)
@@ -166,14 +165,15 @@ exports.getAllStudents = async (req, res) => {
     const hasPrevPage = pageNumber > 1;
 
     res.status(200).json({
-      students,
+      success: true,
+      data: students,
       pagination: {
-        currentPage: pageNumber,
+        page: pageNumber,
+        limit: limitNumber,
+        total: totalStudents,
         totalPages,
-        totalStudents,
-        studentsPerPage: limitNumber,
-        hasNextPage,
-        hasPrevPage,
+        hasNext: hasNextPage,
+        hasPrev: hasPrevPage,
         nextPage: hasNextPage ? pageNumber + 1 : null,
         prevPage: hasPrevPage ? pageNumber - 1 : null
       }

@@ -3,6 +3,7 @@ const router = express.Router();
 const feeController = require("../controllers/feeController");
 
 router.get("/all-unfiltered", feeController.getAllFeesUnfiltered)
+router.get("/filter-options", feeController.getFilterOptions)
 
 router.post("/", feeController.createFee);
 router.get("/", feeController.getFees);

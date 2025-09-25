@@ -36,6 +36,7 @@ router.post("/pricing/save", schoolController.saveDefaultPricing);
 // School Routes
 router.post("/logo", upload.single("logo"), schoolController.createSchool);
 router.get("/", schoolController.getAllSchools);
+router.get("/simple", schoolController.getAllSchoolsSimple);
 router.get("/:id", schoolController.getSchoolById);
 router.put("/logo/:id", upload.single("logo"), schoolController.updateSchool);
 router.delete("/:id", schoolController.deleteSchool);

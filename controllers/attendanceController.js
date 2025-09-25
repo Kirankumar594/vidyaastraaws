@@ -197,7 +197,7 @@ exports.getAttendanceByDate = async (req, res) => {
         $gte: startOfDay,
         $lt: endOfDay
       }
-    }).populate("studentId");
+    }).populate("studentId") .sort({ createdAt: -1 });
 
     console.log(`Found ${attendance.length} attendance records for date ${date}`);
 
@@ -217,18 +217,32 @@ exports.getAllAttendanceUnfiltered = async (req, res) => {
     // Get page & limit from query params (default page=1, limit=10)
     let page = parseInt(req.query.page, 10) || 1;
     let limit = parseInt(req.query.limit, 10) || 10;
+    const { schoolId } = req.query; // Add schoolId filter support
 
     if (page < 1) page = 1;
     if (limit < 1) limit = 10;
 
     const skip = (page - 1) * limit;
 
-    // Get total documents count
-    const totalRecords = await Attendance.countDocuments();
+    // Build query object
+    const query = {};
+    if (schoolId) {
+      query.schoolId = schoolId;
+    }
 
-    // Fetch only paginated data
-    const attendance = await Attendance.find({})
-      .populate("studentId")
+    // Get total documents count
+    const totalRecords = await Attendance.countDocuments(query);
+
+    // Fetch only paginated data with proper population
+    const attendance = await Attendance.find(query)
+      .populate({
+        path: "studentId",
+        select: "name rollNumber studentId className section schoolId"
+      })
+      .populate({
+        path: "schoolId",
+      
+      }).sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -243,6 +257,7 @@ exports.getAllAttendanceUnfiltered = async (req, res) => {
       },
     });
   } catch (err) {
+    console.error("Get all attendance unfiltered error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

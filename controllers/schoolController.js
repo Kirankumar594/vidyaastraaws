@@ -346,15 +346,40 @@ exports.getAllSchools = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(total / limit),
-      search: search || "",
       data: schools,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: parseInt(page) < Math.ceil(total / limit),
+        hasPrev: parseInt(page) > 1,
+        nextPage: parseInt(page) < Math.ceil(total / limit) ? parseInt(page) + 1 : null,
+        prevPage: parseInt(page) > 1 ? parseInt(page) - 1 : null
+      },
+      search: search || "",
     });
   } catch (err) {
     console.error("Get all schools error:", err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// Get All Schools for Super Admin (Simple List)
+exports.getAllSchoolsSimple = async (req, res) => {
+  try {
+    const schools = await School.find({})
+      .select("_id name schoolCode").sort({_id: -1});
+
+    res.status(200).json({
+      success: true,
+      data: schools,
+    });
+  } catch (err) {
+    console.error("Get all schools simple error:", err.message);
     res.status(500).json({
       success: false,
       message: err.message
