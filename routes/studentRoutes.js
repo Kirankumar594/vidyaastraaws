@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const studentController = require("../controllers/studentController");
-const multer = require("multer");
-const upload = multer({})
+const upload = require("../utils/multer"); // Use the proper multer configuration
+
 router.patch('/stats', studentController.getStudentStats);
 router.patch('/schools', studentController.getSchoolsWithStudentCounts);
 router.get('/classes', studentController.getClassesWithStudentCounts);
@@ -10,6 +10,7 @@ router.get('/classes', studentController.getClassesWithStudentCounts);
 router.get("/school/:schoolId", studentController.getStudentsBySchoolId);
 router.get("/student/:schoolId/:classId", studentController.getClassDetails);
 router.get("/class/:className", studentController.getStudentsByClassName);
+router.get("/fix-profile-images", studentController.fixProfileImages);
 
 router.get("/", studentController.getAllStudents);
 

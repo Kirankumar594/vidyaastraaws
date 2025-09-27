@@ -300,6 +300,55 @@ exports.loginSchool = async (req, res) => {
   }
 };
 
+// Verify School Code for Mobile App (NEW ENDPOINT)
+exports.verifySchoolCodeMobile = async (req, res) => {
+  try {
+    const { schoolCode } = req.params;
+    
+    if (!schoolCode) {
+      return res.status(400).json({
+        success: false,
+        message: "School code is required"
+      });
+    }
+
+    // Find school by schoolCode (case-insensitive) - NO FILTERS
+    const school = await School.findOne({ 
+      schoolCode: { $regex: new RegExp(`^${schoolCode}$`, 'i') }
+    }).select("-password");
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid school code"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      school: {
+        _id: school._id,
+        name: school.name,
+        schoolCode: school.schoolCode,
+        email: school.email,
+        phone: school.phone,
+        address: school.address,
+        color: school.color,
+        logoUrl: school.logoUrl,
+        adminName: school.adminName,
+        adminEmail: school.adminEmail,
+        adminContact: school.adminContact
+      }
+    });
+  } catch (error) {
+    console.error("School code verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during school verification"
+    });
+  }
+};
+
 // Get All Schools
 // ---------------- GET ALL SCHOOLS (with Pagination) ----------------
 exports.getAllSchools = async (req, res) => {

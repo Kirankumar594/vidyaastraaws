@@ -9,6 +9,7 @@ const createUploadDirs = () => {
     path.join(__dirname, "../uploads/assignments"),
     path.join(__dirname, "../uploads/temp"),
     path.join(__dirname, "../uploads/profiles"),
+    path.join(__dirname, "../uploads/students"), // Add students directory for profile images
   ]
 
   dirs.forEach((dir) => {
@@ -30,8 +31,8 @@ const storage = multer.diskStorage({
 
     if (req.route && req.route.path.includes("assignments")) {
       uploadPath = path.join(__dirname, "../uploads/assignments")
-    } else if (req.route && req.route.path.includes("profile")) {
-      uploadPath = path.join(__dirname, "../uploads/profiles")
+    } else if (req.route && req.route.path.includes("profile") || file.fieldname === "profileImage") {
+      uploadPath = path.join(__dirname, "../uploads/students")
     } else {
       uploadPath = path.join(__dirname, "../uploads/temp")
     }

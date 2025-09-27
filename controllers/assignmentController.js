@@ -3,53 +3,47 @@ const path = require("path");
 const Assignment = require("../models/Assignment");
 const { uploadFile2 } = require("../config/AWS");
 
-// Get all assignments for a student
-// exports.getStudentAssignments = async (req, res) => {
-//   try {
-//     const { status, studentId, schoolId,typeTE } = req.query;
+// Get all assignments for a student (for mobile app)
+exports.getStudentAssignmentsForStudent = async (req, res) => {
+  try {
+    const { status, studentId, schoolId } = req.query;
 
-//     if (!schoolId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Student ID and School ID are required",
-//       });
-//     }
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
 
-//     const query = { schoolId };
-//     if (status) {
-//       query.status = status;
-//     }
-//     if( studentId ) {
-//       query.studentId = studentId;
-//     }
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Student ID is required",
+      });
+    }
 
-//     if(typeTE){
-//   const assignments = await Assignment.find(query)
-//       .sort({ dueDate: 1 }).populate('studentId')
-//       .lean();
+    const query = { schoolId, studentId };
+    if (status) {
+      query.status = status;
+    }
 
-//     res.json({
-//       success: true,
-//       data: assignments,
-//     });
-//     }else{
-//     const assignments = await Assignment.find(query)
-//       .sort({ dueDate: 1 })
-//       .lean();
+    const assignments = await Assignment.find(query)
+      .sort({ dueDate: 1 })
+      .populate('studentId', 'name rollNumber')
+      .lean();
 
-//     res.json({
-//       success: true,
-//       data: assignments,
-//     });
-//   }
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//     });
-//   }
-// };
+    res.json({
+      success: true,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error("Get student assignments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 // Backend: Optimized getStudentAssignments function with proper MongoDB queries
 exports.getStudentAssignments = async (req, res) => {
 try {
@@ -932,15 +926,67 @@ exports.getAllAssignment = async (req, res) => {
 };
 
 
-exports.getAllAssignmentsUnfiltered = async (req, res) => {
+// Get assignments by school (for admin panel)
+exports.getAssignmentsBySchool = async (req, res) => {
   try {
-    const assignments = await Assignment.find({}).lean();
-    return res.status(200).json({
-      message: "All assignments fetched successfully (unfiltered)",
+    const { schoolId, page = 1, limit = 10, status, subject, className, section, search } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
+
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Build query
+    const query = { schoolId };
+    if (status && status !== 'All') {
+      query.status = status;
+    }
+    if (subject && subject !== 'All') {
+      query.subject = subject;
+    }
+    if (className && className !== 'All') {
+      query.className = className;
+    }
+    if (section && section !== 'All') {
+      query.section = section;
+    }
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Fetch assignments with pagination
+    const assignments = await Assignment.find(query)
+      .populate('studentId', 'name rollNumber')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .lean();
+
+    // Count total documents
+    const total = await Assignment.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
       assignments,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber),
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get assignments by school error:", error);
     res.status(500).json({
       success: false,
       message: "Server error",

@@ -5,15 +5,22 @@ const Circular = require("../models/circularModel")
 // Create Circular
 exports.createCircular = async (req, res) => {
   try {
+    console.log("Create circular request body:", req.body); // Debug log
+    console.log("Create circular request headers:", req.headers); // Debug log
+    
     const { schoolId, ...rest } = req.body // MODIFIED: Get schoolId from body
 
     if (!schoolId) {
+      console.log("Missing schoolId in request body"); // Debug log
       return res.status(400).json({ success: false, message: "School ID is required." })
     }
 
+    console.log("Creating circular with data:", { ...rest, schoolId }); // Debug log
     const newCircular = await Circular.create({ ...rest, schoolId }) // MODIFIED: Add schoolId
+    console.log("Circular created successfully:", newCircular); // Debug log
     res.status(201).json({ success: true, data: newCircular })
   } catch (error) {
+    console.error("Create circular error:", error); // Debug log
     res.status(400).json({ success: false, message: error.message })
   }
 }

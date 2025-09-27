@@ -168,7 +168,7 @@ exports.createBook = async (req, res) => {
     }
 
     // Get the file path for the uploaded image
-    const imagePath =await uploadFile2(req.file, `books/${schoolId}`)
+    const imagePath = await uploadFile2(req.file, `books/${schoolId}`)
 
     // Create the book
     const book = new Book({

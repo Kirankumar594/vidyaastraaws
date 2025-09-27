@@ -99,7 +99,7 @@ exports.getAlbum = async (req, res) => {
         });
     }
 
-    const album = await Album.findById({ _id: id, schoolId: schoolId }); // MODIFIED: Find by ID AND schoolId
+    const album = await Album.findOne({ _id: id, schoolId: schoolId }); // FIXED: Use findOne instead of findById
     if (!album) {
       return res
         .status(404)
@@ -118,6 +118,7 @@ exports.getAlbum = async (req, res) => {
 exports.updateAlbum = async (req, res) => {
   try {
     const { title, date, schoolId } = req.body; // MODIFIED: Get schoolId from body
+    const files = req.files; // FIXED: Get files from request
 
     if (!schoolId) {
       return res
@@ -125,8 +126,8 @@ exports.updateAlbum = async (req, res) => {
         .json({ success: false, message: "School ID is required." });
     }
 
-    const album = await Album.findByIdAndUpdate(
-      { _id: req.params.id, schoolId: schoolId }, // MODIFIED: Find by ID AND schoolId
+    const album = await Album.findOneAndUpdate(
+      { _id: req.params.id, schoolId: schoolId }, // FIXED: Use findOneAndUpdate instead of findByIdAndUpdate
       { title, date },
       { new: true, runValidators: true }
     );
@@ -139,21 +140,28 @@ exports.updateAlbum = async (req, res) => {
           message: "Album not found or does not belong to this school",
         });
     }
-    const imageData = await Promise.all(
-      files.map(async (file) => ({
-        filename: file.filename,
-        // Store relative path instead of full system path
-        path: await uploadFile2(file, 'albums'),
-        size: file.size,
-        mimetype: file.mimetype,
-      }))
-    );
-    if(imageData.length>0){
-      album.images.push(...imageData);
-      await album.save();
+
+    // FIXED: Only process files if they exist
+    if (files && files.length > 0) {
+      const imageData = await Promise.all(
+        files.map(async (file) => ({
+          filename: file.filename,
+          // Store relative path instead of full system path
+          path: await uploadFile2(file, 'albums'),
+          size: file.size,
+          mimetype: file.mimetype,
+        }))
+      );
+      
+      if (imageData.length > 0) {
+        album.images.push(...imageData);
+        await album.save();
+      }
     }
+
     res.status(200).json({ success: true, album });
   } catch (error) {
+    console.error("Update album error:", error); // FIXED: Add error logging
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -170,7 +178,7 @@ exports.deleteAlbum = async (req, res) => {
         .json({ success: false, message: "School ID is required." });
     }
 
-    const album = await Album.findById({ _id: id, schoolId: schoolId }); // MODIFIED: Find by ID AND schoolId
+    const album = await Album.findOne({ _id: id, schoolId: schoolId }); // FIXED: Use findOne instead of findById
     if (!album) {
       return res
         .status(404)
@@ -188,7 +196,7 @@ exports.deleteAlbum = async (req, res) => {
     //   }
     // });
 
-    await Album.findByIdAndDelete({ _id: id, schoolId: schoolId }); // MODIFIED: Delete by ID AND schoolId
+    await Album.findOneAndDelete({ _id: id, schoolId: schoolId }); // FIXED: Use findOneAndDelete instead of findByIdAndDelete
     res
       .status(200)
       .json({ success: true, message: "Album deleted successfully" });

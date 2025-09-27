@@ -5,7 +5,7 @@ const mongoose = require("mongoose")
 const { v4: uuidv4 } = require("uuid")
 
 // Create new fee entry with admin-defined installment breakdown
-exports.createFee = async (req, res) => {
+exports.createFee = async (req, res) => {      
   try {
     const { schoolId, installments, studentId, ...rest } = req.body
 

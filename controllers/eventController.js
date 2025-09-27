@@ -4,16 +4,23 @@ const Event = require("../models/Event")
 // Create Event
 exports.createEvent = async (req, res) => {
   try {
+    console.log("Create event request body:", req.body); // Debug log
+    console.log("Create event request headers:", req.headers); // Debug log
+    
     const { schoolId, ...rest } = req.body // MODIFIED: Get schoolId from body
 
     if (!schoolId) {
+      console.log("Missing schoolId in request body"); // Debug log
       return res.status(400).json({ success: false, message: "School ID is required." })
     }
 
+    console.log("Creating event with data:", { ...rest, schoolId }); // Debug log
     const event = new Event({ ...rest, schoolId }) // MODIFIED: Add schoolId
     await event.save()
+    console.log("Event created successfully:", event); // Debug log
     res.status(201).json(event)
   } catch (err) {
+    console.error("Create event error:", err); // Debug log
     res.status(400).json({ error: err.message })
   }
 }

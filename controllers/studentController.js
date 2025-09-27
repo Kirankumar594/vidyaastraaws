@@ -6,7 +6,60 @@ const bcrypt = require("bcryptjs");
 const School = require("../models/School");
 const mongoose = require('mongoose');
 
-const { uploadFile2 } = require("../config/AWS");
+const { uploadFile2, makeObjectPublic } = require("../config/AWS");
+
+// Fix existing profile images by making them public
+exports.fixProfileImages = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "School ID is required" });
+    }
+
+    // Get all students with profile images
+    const students = await Student.find({ 
+      schoolId, 
+      profileImage: { $exists: true, $ne: "" } 
+    });
+
+    let fixedCount = 0;
+    let errorCount = 0;
+
+    for (const student of students) {
+      if (student.profileImage && student.profileImage.startsWith('https://')) {
+        // Extract the key from the S3 URL
+        const urlParts = student.profileImage.split('/');
+        const key = urlParts.slice(3).join('/'); // Remove https://bucket.s3.amazonaws.com/
+        
+        try {
+          const success = await makeObjectPublic(key);
+          if (success) {
+            fixedCount++;
+            console.log(`Fixed image for student: ${student.name}`);
+          } else {
+            errorCount++;
+            console.log(`Failed to fix image for student: ${student.name}`);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Error fixing image for student ${student.name}:`, error);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Fixed ${fixedCount} images, ${errorCount} errors`,
+      fixedCount,
+      errorCount,
+      totalStudents: students.length
+    });
+
+  } catch (error) {
+    console.error("Fix profile images error:", error);
+    res.status(500).json({ success: false, message: "Failed to fix profile images" });
+  }
+};
 
 // FIXED: Get Student Profile - Updated to include section information
 exports.getStudentProfile = async (req, res) => {
@@ -29,6 +82,11 @@ exports.updateStudentProfile = async (req, res) => {
     const studentId = req.params.id;
     let updateFields = { ...req.body };
 
+    console.log("🔍 Update student profile request:");
+    console.log("📋 Request body:", req.body);
+    console.log("📸 Request file:", req.file);
+    console.log("🆔 Student ID:", studentId);
+
     // ✅ Handle password update safely
     if (updateFields.password && updateFields.password.trim() !== "") {
       const salt = await bcrypt.genSalt(10);
@@ -38,9 +96,12 @@ exports.updateStudentProfile = async (req, res) => {
       delete updateFields.password;
     }
 
-
     if (req.file) {
+      console.log("📸 Processing file upload:", req.file);
       updateFields.profileImage = await uploadFile2(req.file, "students");
+      console.log("✅ File uploaded successfully:", updateFields.profileImage);
+    } else {
+      console.log("❌ No file received in request");
     }
 
 
@@ -1313,6 +1374,10 @@ exports.deleteStudent = async (req, res) => {
 exports.getStudentsByClassName = async (req, res) => {
   try {
     const { className } = req.params;
+    const { schoolId, section } = req.query;
+    
+    console.log("getStudentsByClassName called with:", { className, schoolId, section });
+    
     if (!className) {
       return res.status(400).json({
         success: false,
@@ -1320,32 +1385,85 @@ exports.getStudentsByClassName = async (req, res) => {
       });
     }
 
-    // Find the class by name
-    const classData = await Class.findOne({ className });
-    if (!classData) {
-      return res.status(404).json({
-        success: false,
-        message: "Class not found with this name.",
+    // Try to find class in both class systems
+    const Class = require("../models/Class");
+    const ClassName = require("../models/classmodel");
+    
+    let classData = null;
+    let students = [];
+    
+    // First, try to find in the main Class model
+    let classQuery = { className };
+    if (schoolId) {
+      classQuery.schoolId = schoolId;
+    }
+    
+    console.log("Looking for class in Class model with query:", classQuery);
+    classData = await Class.findOne(classQuery);
+    console.log("Found class in Class model:", classData);
+    
+    if (classData) {
+      // Found in Class model, get students by classId
+      let studentQuery = { classId: classData._id };
+      if (schoolId) {
+        studentQuery.schoolId = schoolId;
+      }
+      
+      console.log("Looking for students with classId:", studentQuery);
+      students = await Student.find(studentQuery)
+        .populate("classId", "className section classTeacher")
+        .populate("schoolId")
+        .sort({ createdAt: -1 });
+    } else {
+      // Try to find in the ClassName model
+      console.log("Class not found in Class model, trying ClassName model");
+      const classNameQuery = { className };
+      if (schoolId) {
+        classNameQuery.schoolId = schoolId;
+      }
+      
+      const classNameData = await ClassName.findOne(classNameQuery);
+      console.log("Found class in ClassName model:", classNameData);
+      
+      if (classNameData) {
+        // Found in ClassName model, get students by className field
+        let studentQuery = { className: className };
+        if (schoolId) {
+          studentQuery.schoolId = schoolId;
+        }
+        
+        console.log("Looking for students with className:", studentQuery);
+        students = await Student.find(studentQuery)
+          .populate("schoolId")
+          .sort({ createdAt: -1 });
+      }
+    }
+
+    console.log("Found students before section filter:", students.length);
+
+    // Filter by section if provided
+    if (section !== undefined && section !== '' && students.length > 0) {
+      students = students.filter(student => {
+        const studentSection = student.classId?.section || student.section;
+        console.log("Student section:", studentSection, "Looking for:", section);
+        return studentSection === section || studentSection === String(section);
       });
     }
 
-    // Find students belonging to this class
-    const students = await Student.find({ classId: classData._id })
-      .populate("classId", "className section classTeacher")
-      .populate("schoolId")
-      .sort({ createdAt: -1 });
+    console.log("Final students count:", students.length);
 
     if (students.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `No students found in class ${className}.`,
+        message: `No students found in class ${className}${section ? ` section ${section}` : ''}.`,
       });
     }
 
     res.status(200).json({
       success: true,
       count: students.length,
-      class: classData.className,
+      class: className,
+      section: section || 'All',
       data: students,
     });
   } catch (error) {

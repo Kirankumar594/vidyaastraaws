@@ -4,6 +4,7 @@ const {
   DeleteObjectCommand,
   ListObjectsV2Command,
   GetObjectCommand,
+  PutObjectAclCommand,
 } = require("@aws-sdk/client-s3");
 const dotenv = require("dotenv");
 const fs = require("fs");
@@ -107,6 +108,7 @@ const uploadFile2 = (file, bucketname) => {
       Key: `${bucketname}/${Date.now() + "_" + file.originalname}`,
       Body: file.buffer,
       ContentType: file.mimetype,
+      // ACL removed - bucket should have public read policy instead
     };
     const command = new PutObjectCommand(params);
     s3Client.send(command, (err, data) => {
@@ -123,6 +125,18 @@ const uploadFile2 = (file, bucketname) => {
 };
 
 
+const makeObjectPublic = async (key) => {
+  try {
+    // Since ACL is disabled, we'll just return true
+    // The bucket should have a public read policy instead
+    console.log(`Object ${key} should be accessible via bucket policy`);
+    return true;
+  } catch (error) {
+    console.error(`Error making object public: ${key}`, error);
+    return false;
+  }
+};
+
 const getUrlFileKey = (url) => {
   const regex = /^https?:\/\/([^\.]+)\.s3.amazonaws.com\/(.+)$/;
   const match = url.match(regex);
@@ -134,8 +148,7 @@ const getUrlFileKey = (url) => {
 };
 
 const deleteFile = async (url) => {
-  
- const fileKey= getUrlFileKey(url)
+  const fileKey = getUrlFileKey(url);
  console.log(fileKey);
   const params = {
     Bucket: process.env.AWS_S3_BUCKET_NAME,
@@ -195,4 +208,4 @@ const multifileUpload = async (files, bucketname) => {
   );
 };
 
-module.exports= { uploadFile,uploadFile2, deleteFile, updateFile, multifileUpload,downloadAllImages };
+module.exports= { uploadFile,uploadFile2, deleteFile, updateFile, multifileUpload,downloadAllImages, makeObjectPublic };
