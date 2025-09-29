@@ -69,12 +69,22 @@ const resultSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Enhanced pre-save hook with better error handling
+// ✅ Enhanced pre-save hook with better error handling and duplicate subject validation
 resultSchema.pre("save", function (next) {
   try {
     if (this.results && this.results.length > 0) {
       this.results = this.results.map((exam) => {
         if (exam.subjects && exam.subjects.length > 0) {
+          // Check for duplicate subjects within the same exam
+          const subjectNames = exam.subjects.map(subject => subject.subjectName.toLowerCase());
+          const uniqueSubjectNames = [...new Set(subjectNames)];
+          
+          if (subjectNames.length !== uniqueSubjectNames.length) {
+            const error = new Error('Duplicate subjects are not allowed in the same exam result');
+            error.name = 'ValidationError';
+            throw error;
+          }
+
           const totalMax = exam.subjects.reduce(
             (sum, subj) => sum + (subj.maxMarks || 0),
             0

@@ -1036,6 +1036,17 @@ exports.createResult = async (req, res) => {
           message: "Each result must have at least one subject.",
         });
       }
+
+      // Check for duplicate subjects within the same result
+      const subjectNames = result.subjects.map(subject => subject.subjectName.toLowerCase());
+      const uniqueSubjectNames = [...new Set(subjectNames)];
+      
+      if (subjectNames.length !== uniqueSubjectNames.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Duplicate subjects are not allowed in the same result. Please ensure each subject appears only once.",
+        });
+      }
     }
 
     // Find existing result document for this student or create new one
@@ -1308,14 +1319,14 @@ exports.addSubjectToResult = async (req, res) => {
       });
     }
 
-    // Check if subject already exists
+    // Check if subject already exists (case-insensitive comparison)
     const existingSubject = resultItem.subjects.find(
-      (s) => s.subjectName === subject.subjectName
+      (s) => s.subjectName.toLowerCase() === subject.subjectName.toLowerCase()
     );
     if (existingSubject) {
       return res.status(400).json({
         success: false,
-        message: "Subject already exists in this result",
+        message: "Subject already exists in this result. Please use a different subject name or update the existing one.",
       });
     }
 

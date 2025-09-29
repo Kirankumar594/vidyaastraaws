@@ -15,6 +15,6 @@ router.post("/:schoolId/:studentId", createResult); // Create result
 router.get("/results/:schoolId", getAllResults); // Get all results
 router.get("/:studentId", getResultsByStudent); // Get results by student
 router.put("/:schoolId/:studentId/:resultId", updateResult);
-router.delete("/:id", deleteResult); // Delete result by ID
+router.delete("/:schoolId/:studentId/:resultId", deleteResult); // Delete result by ID
 
 module.exports = router;
