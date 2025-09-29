@@ -1074,7 +1074,40 @@ exports.createResult = async (req, res) => {
       });
     }
   } catch (err) {
-    console.log("eerror===>",err)
+    console.error("❌ Error in createResult:", err);
+    console.error("❌ Error name:", err.name);
+    console.error("❌ Error message:", err.message);
+    console.error("❌ Error stack:", err.stack);
+    
+    // Handle specific error types
+    if (err.name === 'ValidationError') {
+      // Check if it's a standard Mongoose ValidationError with errors property
+      if (err.errors && typeof err.errors === 'object') {
+        const errors = Object.keys(err.errors).map(key => err.errors[key].message);
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors,
+          error: err.message,
+        });
+      } else {
+        // Handle custom ValidationError from pre-save hook
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          error: err.message,
+        });
+      }
+    }
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid data format",
+        error: `Invalid ${err.path}: ${err.value}`,
+      });
+    }
+    
     res.status(400).json({
       success: false,
       message: "Error creating/adding result",
@@ -1134,7 +1167,39 @@ exports.addResultToStudent = async (req, res) => {
       data: resultDoc,
     });
   } catch (err) {
-    console.log("error",err)
+    console.error("❌ Error in addResultToStudent:", err);
+    console.error("❌ Error name:", err.name);
+    console.error("❌ Error message:", err.message);
+    
+    // Handle specific error types
+    if (err.name === 'ValidationError') {
+      // Check if it's a standard Mongoose ValidationError with errors property
+      if (err.errors && typeof err.errors === 'object') {
+        const errors = Object.keys(err.errors).map(key => err.errors[key].message);
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors,
+          error: err.message,
+        });
+      } else {
+        // Handle custom ValidationError from pre-save hook
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          error: err.message,
+        });
+      }
+    }
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid data format",
+        error: `Invalid ${err.path}: ${err.value}`,
+      });
+    }
+    
     res.status(400).json({
       success: false,
       message: "Error adding result to student",
