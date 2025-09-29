@@ -13,8 +13,13 @@ const { pipeline } = require("stream");
 const { promisify } = require("util");
 dotenv.config();
 
+const awsRegion = process.env.AWS_REGION || "us-east-1";
+console.log("AWS Region:", awsRegion);
+console.log("AWS Access Key ID:", process.env.AWS_ACCESS_KEY_ID ? "Set" : "Not set");
+console.log("AWS Secret Access Key:", process.env.AWS_SECRET_ACCESS_KEY ? "Set" : "Not set");
+
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+  region: awsRegion,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -106,7 +111,7 @@ const uploadFile2 = (file, bucketname) => {
     const params = {
       Bucket: process.env.AWS_S3_BUCKET_NAME,
       Key: `${bucketname}/${Date.now() + "_" + file.originalname}`,
-      Body: file.buffer,
+      Body: file.buffer || fs.createReadStream(file.path), // Handle both buffer and disk storage
       ContentType: file.mimetype,
       // ACL removed - bucket should have public read policy instead
     };
@@ -208,4 +213,4 @@ const multifileUpload = async (files, bucketname) => {
   );
 };
 
-module.exports= { uploadFile,uploadFile2, deleteFile, updateFile, multifileUpload,downloadAllImages, makeObjectPublic };
+module.exports= { uploadFile,uploadFile2, deleteFile, updateFile, multifileUpload,downloadAllImages, makeObjectPublic, s3Client };

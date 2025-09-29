@@ -47,11 +47,21 @@ connectDB();
 const app = express();
 
 // CORS configuration
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://vidyaastra.com',
+    'https://www.vidyaastra.com'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing middleware with increased limits
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logging middleware
 function parseUserAgent(userAgent) {
@@ -79,8 +89,7 @@ app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'] || 'Unknown';
   const { browser, os } = parseUserAgent(userAgent);
 
-  console.log(`Browser: ${browser}` + ` | OS: ${os}`  + ` | Time: ${new Date().toISOString()}` + ` | URL: ${req.originalUrl}` + ` | Method: ${req.method}` + ` | IP: ${req.ip}`);
-  console.log('---------------------------');
+
   next();
 });
 
@@ -142,15 +151,173 @@ app.use("/api/exam-types", exameRoutesType);
 // Error handling middleware
 
 
+// Debug endpoint to list S3 objects
+app.get('/debug-s3', async (req, res) => {
+  try {
+    const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
+    const { s3Client } = require('./config/AWS');
+    
+    const listParams = {
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Prefix: 'students/',
+      MaxKeys: 10
+    };
+    
+    const command = new ListObjectsV2Command(listParams);
+    const response = await s3Client.send(command);
+    
+    res.json({
+      success: true,
+      objects: response.Contents?.map(obj => ({
+        key: obj.Key,
+        size: obj.Size,
+        lastModified: obj.LastModified
+      })) || []
+    });
+  } catch (error) {
+    console.error('❌ Error listing S3 objects:', error.message);
+    res.status(500).json({ error: 'Error listing S3 objects', details: error.message });
+  }
+});
+
+// Cleanup endpoint to delete empty S3 objects
+app.get('/cleanup-empty-s3', async (req, res) => {
+  try {
+    const { ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+    const { s3Client } = require('./config/AWS');
+    
+    const listParams = {
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Prefix: 'students/',
+      MaxKeys: 100
+    };
+    
+    const command = new ListObjectsV2Command(listParams);
+    const response = await s3Client.send(command);
+    
+    const emptyObjects = response.Contents?.filter(obj => obj.Size === 0) || [];
+    console.log(`Found ${emptyObjects.length} empty objects to delete`);
+    
+    const deletePromises = emptyObjects.map(async (obj) => {
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: process.env.AWS_S3_BUCKET_NAME,
+        Key: obj.Key
+      });
+      await s3Client.send(deleteCommand);
+      console.log(`Deleted empty object: ${obj.Key}`);
+    });
+    
+    await Promise.all(deletePromises);
+    
+    res.json({
+      success: true,
+      message: `Deleted ${emptyObjects.length} empty objects`,
+      deletedObjects: emptyObjects.map(obj => obj.Key)
+    });
+  } catch (error) {
+    console.error('❌ Error cleaning up S3 objects:', error.message);
+    res.status(500).json({ error: 'Error cleaning up S3 objects', details: error.message });
+  }
+});
+
+// Clear student profile images from database
+app.get('/clear-student-images', async (req, res) => {
+  try {
+    const Student = require('./models/Student');
+    
+    // Clear profileImage field for all students
+    const result = await Student.updateMany(
+      { profileImage: { $exists: true, $ne: "" } },
+      { $unset: { profileImage: 1 } }
+    );
+    
+    console.log(`Cleared profile images for ${result.modifiedCount} students`);
+    
+    res.json({
+      success: true,
+      message: `Cleared profile images for ${result.modifiedCount} students`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('❌ Error clearing student images:', error.message);
+    res.status(500).json({ error: 'Error clearing student images', details: error.message });
+  }
+});
+
+// S3 Image Proxy - serves images from S3 through the backend using AWS SDK
 app.get('/proxy-image', async (req, res) => {
   try {
     const imageUrl = req.query.url;
-    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    console.log('🖼️ Proxying image:', imageUrl);
+    
+    // Extract S3 key from URL
+    const urlParts = imageUrl.split('vidyaastra.s3.amazonaws.com/');
+    if (urlParts.length !== 2) {
+      throw new Error('Invalid S3 URL format');
+    }
+    
+    let s3Key = urlParts[1];
+    // Remove query parameters if any
+    s3Key = s3Key.split('?')[0];
+    console.log('🔑 S3 Key:', s3Key);
+    console.log('🔑 Full URL:', imageUrl);
+    console.log('🔑 Bucket:', process.env.AWS_S3_BUCKET_NAME);
+    
+    // Use AWS SDK to get the object
+    const { GetObjectCommand } = require('@aws-sdk/client-s3');
+    const { s3Client } = require('./config/AWS');
+    
+    const getObjectParams = {
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: s3Key,
+    };
+    
+    const command = new GetObjectCommand(getObjectParams);
+    const response = await s3Client.send(command);
+    
+    // Convert stream to buffer
+    const chunks = [];
+    for await (const chunk of response.Body) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
 
-    res.set('Content-Type', response.headers['content-type']);
-    res.send(response.data);
+    // Set appropriate headers
+    res.set('Content-Type', response.ContentType || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.set('Access-Control-Allow-Origin', '*');
+    
+    res.send(buffer);
+    console.log('✅ Image proxied successfully via AWS SDK');
   } catch (error) {
-    res.status(500).send('Error fetching image');
+    console.error('❌ Error proxying image:', error.message);
+    res.status(500).json({ error: 'Error fetching image', details: error.message });
+  }
+});
+
+// S3 Image Proxy with path parameter (alternative approach)
+app.get('/s3-image/*', async (req, res) => {
+  try {
+    const s3Path = req.params[0]; // Get everything after /s3-image/
+    const imageUrl = `https://vidyaastra.s3.amazonaws.com/${s3Path}`;
+    
+    console.log('🖼️ Proxying S3 image:', imageUrl);
+    
+    const response = await axios.get(imageUrl, { 
+      responseType: 'arraybuffer',
+      timeout: 10000
+    });
+
+    // Set appropriate headers
+    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Access-Control-Allow-Origin', '*');
+    
+    res.send(response.data);
+    console.log('✅ S3 image proxied successfully');
+  } catch (error) {
+    console.error('❌ Error proxying S3 image:', error.message);
+    res.status(500).json({ error: 'Error fetching S3 image', details: error.message });
   }
 });
 

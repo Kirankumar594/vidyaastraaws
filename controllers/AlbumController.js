@@ -11,10 +11,15 @@ if (!fs.existsSync(uploadDir)) {
 
 exports.uploadAlbum = async (req, res) => {
   try {
+    console.log("📸 Album upload request received");
+    console.log("📋 Request body:", req.body);
+    console.log("📁 Request files:", req.files);
+    
     const { title, date, schoolId } = req.body; // MODIFIED: Get schoolId from body
     const files = req.files;
 
     if (!schoolId) {
+      console.log("❌ School ID missing");
       return res
         .status(400)
         .json({ success: false, message: "School ID is required." });
@@ -22,25 +27,39 @@ exports.uploadAlbum = async (req, res) => {
 
     // Validate inputs
     if (!title || !date) {
+      console.log("❌ Title or date missing");
       return res.status(400).json({ error: "Title and date are required" });
     }
     if (!files || files.length === 0) {
+      console.log("❌ No files provided");
       return res.status(400).json({ error: "At least one image is required" });
     }
 
     // Prepare image data for storage
+    console.log("🔄 Starting image upload to S3...");
     const imageData = await Promise.all(
-      files.map(async (file) => ({
-        filename: file.filename,
-        // Store relative path instead of full system path
-        path: await uploadFile2(file, 'albums'),
-        size: file.size,
-        mimetype: file.mimetype,
-      }))
+      files.map(async (file, index) => {
+        console.log(`📤 Uploading image ${index + 1}/${files.length}: ${file.originalname}`);
+        try {
+          const s3Path = await uploadFile2(file, 'albums');
+          console.log(`✅ Image ${index + 1} uploaded successfully: ${s3Path}`);
+          return {
+            filename: file.filename,
+            // Store relative path instead of full system path
+            path: s3Path,
+            size: file.size,
+            mimetype: file.mimetype,
+          };
+        } catch (error) {
+          console.error(`❌ Failed to upload image ${index + 1}:`, error);
+          throw error;
+        }
+      })
     );
 
 
     // Create and save album
+    console.log("💾 Creating album in database...");
     const album = new Album({
       title,
       date,
@@ -48,16 +67,32 @@ exports.uploadAlbum = async (req, res) => {
       schoolId, // MODIFIED: Add schoolId
     });
 
+    console.log("📝 Album data:", {
+      title: album.title,
+      date: album.date,
+      schoolId: album.schoolId,
+      imageCount: album.images.length
+    });
+
     await album.save();
+    console.log("✅ Album saved successfully with ID:", album._id);
 
     res.status(201).json({
+      success: true,
       message: "Album uploaded successfully",
       album,
     });
   } catch (error) {
+    console.error("❌ Album upload error:", error);
+    console.error("❌ Error stack:", error.stack);
     res
       .status(500)
-      .json({ error: "Server error during upload", details: error.message });
+      .json({ 
+        success: false,
+        error: "Server error during upload", 
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
   }
 };
 
