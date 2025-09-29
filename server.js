@@ -3,6 +3,7 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const cors = require("cors");
 const path = require("path");
+const upload = require("./utils/multer");
 
 // Import routes
 const superAdminRoutes = require("./routes/superAdminRoutes");
@@ -60,8 +61,8 @@ app.use(cors({
 }));
 
 // Body parsing middleware with increased limits
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Request logging middleware
 function parseUserAgent(userAgent) {
@@ -89,6 +90,11 @@ app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'] || 'Unknown';
   const { browser, os } = parseUserAgent(userAgent);
 
+  // Debug request size
+  const contentLength = req.headers['content-length'];
+  if (contentLength) {
+    console.log(`📏 Request size: ${contentLength} bytes (${(contentLength / 1024 / 1024).toFixed(2)} MB)`);
+  }
 
   next();
 });
@@ -322,14 +328,63 @@ app.get('/s3-image/*', async (req, res) => {
 });
 
 
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  
+  // Handle specific error types
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ 
+      error: "File too large", 
+      message: "The uploaded file exceeds the maximum allowed size" 
+    });
+  }
+  
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ 
+      error: "Unexpected file field", 
+      message: "Too many files uploaded" 
+    });
+  }
+  
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ 
+      error: "Request entity too large", 
+      message: "The request payload exceeds the maximum allowed size" 
+    });
+  }
+  
   res.status(500).json({ error: "Something went wrong!" });
 });
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+// Test image upload endpoint
+app.post("/api/test-upload", upload.single("profileImage"), (req, res) => {
+  console.log("🧪 Test upload endpoint called");
+  console.log("📸 Request file:", req.file);
+  console.log("📋 Request body:", req.body);
+  
+  if (req.file) {
+    res.json({
+      success: true,
+      message: "File received successfully",
+      file: {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        fieldname: req.file.fieldname
+      }
+    });
+  } else {
+    res.json({
+      success: false,
+      message: "No file received"
+    });
+  }
 });
  
 app.use(express.static(path.join(__dirname, 'build'))); // Change 'build' to your frontend folder if needed

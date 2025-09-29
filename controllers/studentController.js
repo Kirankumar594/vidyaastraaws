@@ -1034,6 +1034,12 @@ exports.createStudent = async (req, res) => {
   session.startTransaction();
 
   try {
+    console.log("🔍 Student creation request received:");
+    console.log("📋 Request body:", req.body);
+    console.log("📸 Request file:", req.file);
+    console.log("📋 Request files:", req.files);
+    console.log("📋 Request headers:", req.headers);
+    
     if (!req.body) {
       return res
         .status(400)
@@ -1134,12 +1140,20 @@ exports.createStudent = async (req, res) => {
 
     // Handle profile image upload
     let profileImagePath = "";
+    console.log("🔍 Student creation - File upload check:");
+    console.log("📸 Request file:", req.file);
+    console.log("📋 Request files:", req.files);
+    
     if (req.file) {
       try {
+        console.log("📸 Processing file upload:", req.file);
         profileImagePath = await uploadFile2(req.file, "students");
+        console.log("✅ File uploaded successfully:", profileImagePath);
       } catch (fileError) {
-        console.error("File upload error:", fileError);
+        console.error("❌ File upload error:", fileError);
       }
+    } else {
+      console.log("❌ No file received in request");
     }
 
     // Create new student
@@ -1158,7 +1172,8 @@ exports.createStudent = async (req, res) => {
       motherName,
       parentPhone,
       schoolId,
-      profileImage: profileImagePath,classN,
+      profileImage: profileImagePath,
+      classN,
       section,
     });
 
