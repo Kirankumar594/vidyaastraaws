@@ -34,6 +34,7 @@ const schoolRoutes = require("./routes/schoolRoutes");
 const classRoutes = require("./routes/classRoutes");
 const packageRoutes = require("./routes/packageRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const paymentSystemRoutes = require("./routes/paymentSystemRoutes");
 const teacherLoginRoutes = require("./routes/teacherLoginRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const assignmentRoutes = require("./routes/assignmentRoute");
@@ -42,6 +43,8 @@ const enquiryRoutes = require("./routes/enquiryRoute");
 const classesRoutes = require("./routes/classRoute");
 const exameRoutesType = require("./routes/exameRoute");
 const { default: axios } = require("axios");
+// Start simple payment verification service
+const simplePaymentVerification = require("./simple-payment-verification");
 dotenv.config();
 connectDB();
 
@@ -148,6 +151,7 @@ app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/class", classRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/payment-system", paymentSystemRoutes);
 app.use("/api/teacher", teacherLoginRoutes);
 app.use("/api/subject", subject);
 app.use("/api/notifications", notificationRoutes);
@@ -398,4 +402,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Static files served from: ${path.join(__dirname, "uploads")}`);
+  
+  // Simple payment verification service is already started
 });

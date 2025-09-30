@@ -10,6 +10,7 @@ const createUploadDirs = () => {
     path.join(__dirname, "../uploads/temp"),
     path.join(__dirname, "../uploads/profiles"),
     path.join(__dirname, "../uploads/students"), // Add students directory for profile images
+    path.join(__dirname, "../uploads/payment-qr"), // Add payment QR code directory
   ]
 
   dirs.forEach((dir) => {
@@ -33,6 +34,8 @@ const storage = multer.diskStorage({
       uploadPath = path.join(__dirname, "../uploads/assignments")
     } else if (req.route && req.route.path.includes("profile") || file.fieldname === "profileImage") {
       uploadPath = path.join(__dirname, "../uploads/students")
+    } else if (file.fieldname === "qrCode") {
+      uploadPath = path.join(__dirname, "../uploads/payment-qr")
     } else {
       uploadPath = path.join(__dirname, "../uploads/temp")
     }
