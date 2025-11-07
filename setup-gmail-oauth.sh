@@ -59,3 +59,4 @@ echo "4. Follow the OAuth URL to authorize Gmail access"
 echo "5. Your payment verification system will be ready!"
 echo ""
 echo "📚 For detailed instructions, see PAYMENT_SYSTEM_README.md"
+
