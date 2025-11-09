@@ -44,7 +44,7 @@ const classesRoutes = require("./routes/classRoute");
 const exameRoutesType = require("./routes/exameRoute");
 const { default: axios } = require("axios");
 // Start simple payment verification service
-const simplePaymentVerification = require("./simple-payment-verification");
+// const simplePaymentVerification = require("./simple-payment-verification");
 dotenv.config();
 connectDB();
 
